@@ -52,7 +52,7 @@ def _format_files(files: Iterable[str]) -> List[str]:
         try:
             path = path.resolve(strict=True)
         except FileNotFoundError:
-            print(f"[警告] 找不到文件: {path}")
+            print(f"[警告] 找不到文件: {path} ")
             continue
         resolved.append(str(path))
     return resolved
