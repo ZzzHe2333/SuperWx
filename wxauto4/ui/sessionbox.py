@@ -24,9 +24,20 @@ class SessionBox:
         self.init()
 
     def init(self):
-        self.searchbox = self.control.GroupControl(ClassName="mmui::XSearchField").EditControl()
-        self.session_list = self.control.GroupControl(ClassName="mmui::ChatSessionList").\
-            ListControl(ClassName="mmui::XTableView", Name="会话")
+        # Search box / session list selectors changed across WeChat builds.
+        # Keep legacy selectors but add robust fallbacks.
+        self.searchbox = (
+            self.control.GroupControl(ClassName="mmui::XSearchField").EditControl()
+            or self.control.EditControl(Name="搜索")
+            or self.control.EditControl(ClassName="mmui::XValidatorTextEdit")
+            or self.control.EditControl()
+        )
+
+        self.session_list = (
+            self.control.GroupControl(ClassName="mmui::ChatSessionList").ListControl(ClassName="mmui::XTableView", Name="会话")
+            or self.control.ListControl()  # fallback: the first list under session area
+        )
+
         self.search_content = self.parent.control.WindowControl(ClassName="mmui::SearchContentPopover")
         
     def roll_up(self, n: int=5):
@@ -72,6 +83,18 @@ class SessionBox:
         force_wait: Union[float, int] = 0.5
     ):
         wxlog.debug(f"切换聊天窗口: {keywords}, {exact}, {force}, {force_wait}")
+        # Fast path: click session item directly by AutomationId (newer WeChat uses session_item_<chatname>)
+        try:
+            direct = (
+                self.parent.control.ListItemControl(AutomationId=f"session_item_{keywords}")
+                or self.root.control.ListItemControl(AutomationId=f"session_item_{keywords}")
+            )
+            if direct and direct.Exists(0):
+                direct.Click()
+                return keywords
+        except Exception:
+            pass
+
         search_box = self.search_content.ListControl()
         search_result = self.search(keywords, force, force_wait)
         t0 = time.time()

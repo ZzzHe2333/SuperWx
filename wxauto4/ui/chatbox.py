@@ -101,9 +101,30 @@ class ChatBox(BaseUISubWnd):
             self.editbox.MiddleClick()
 
     def init(self):
-        self.msgbox = self.control.GroupControl(ClassName="mmui::MessageView").ListControl()
-        self.editbox = self.control.EditControl(ClassName="mmui::ChatInputField")
+        # Prefer stable AutomationId selectors (newer WeChat versions expose them)
+        # Message list
+        self.msgbox = (
+            self.control.ListControl(AutomationId="chat_message_list")
+            or self.control.GroupControl(ClassName="mmui::MessageView").ListControl(AutomationId="chat_message_list")
+            or self.control.GroupControl(ClassName="mmui::MessageView").ListControl()
+            or self.control.ListControl()
+        )
+
+        # Chat input field (Name may change with current chat; do NOT use Name here)
+        self.editbox = (
+            self.control.EditControl(AutomationId="chat_input_field")
+            or self.control.EditControl(ClassName="mmui::ChatInputField")
+        )
+
+        # Send button: no stable AutomationId in some builds, so use Name fuzzy match as fallback
         self.sendbtn = self.control.ButtonControl(Name=self._lang('发送(S)'))
+        if not self.sendbtn or not self.sendbtn.Exists(0):
+            # Try common variants (Chinese/English, with/without shortcut hint)
+            self.sendbtn = (
+                self.control.ButtonControl(Name='发送')
+                or self.control.ButtonControl(Name='Send')
+                or self.control.ButtonControl(Name='发送(S)')
+            )
         self.tools = self.control.ToolBarControl()
         self._empty = False
         # self._now_chat_info = self.get_info()

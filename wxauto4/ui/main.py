@@ -21,6 +21,29 @@ import os
 import re
 import sys
 
+
+def _find_wechat_main_hwnd_by_uia(ui_name: str = '微信', ui_cls_name: str = 'mmui::MainWindow') -> int:
+    """Find WeChat main window handle via UIAutomation (more robust than Qt window class names)."""
+    try:
+        root = uia.GetRootControl()
+        for w in root.GetChildren():
+            try:
+                if (w.ClassName == ui_cls_name) and ((w.Name or '') == ui_name):
+                    return int(getattr(w, 'NativeWindowHandle', 0) or 0)
+            except Exception:
+                continue
+        # Fallback: match by name only
+        for w in root.GetChildren():
+            try:
+                if (w.Name or '') == ui_name:
+                    return int(getattr(w, 'NativeWindowHandle', 0) or 0)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return 0
+
+
 class WeChatSubWnd(BaseUISubWnd):
     _ui_cls_name: str = 'mmui::FramelessMainWindow'
     _win_cls_name: str = 'Qt51514QWindowIcon'
@@ -42,7 +65,7 @@ class WeChatSubWnd(BaseUISubWnd):
         self.control = uia.ControlFromHandle(hwnd)
         if self.control is not None:
             chatbox_control = self.control.\
-                GroupControl(ClassName="mmui::ChatMessagePage").\
+                GroupControl(AutomationId="chat_message_page", ClassName="mmui::ChatMessagePage").\
                 CustomControl(ClassName="mmui::XSplitterView")
             self._chat_api = ChatBox(chatbox_control, self)
             self.nickname = self.control.Name
@@ -137,15 +160,23 @@ class WeChatMainWnd(WeChatSubWnd):
         if hwnd:
             self._setup_ui(hwnd)
         else:
+            # Try legacy Win32 enumeration first (older builds)
             wxs = [i for i in GetAllWindows() if i[1] == self._win_cls_name]
             if len(wxs) == 0:
-                raise Exception('未找到已登录的微信主窗口')
-            for index, (hwnd, clsname, winname) in enumerate(wxs):
+                # Newer WeChat builds may change the top-level Qt window class;
+                # fall back to UIAutomation to locate the main window.
+                hwnd = _find_wechat_main_hwnd_by_uia(self._ui_name, self._ui_cls_name)
+                if not hwnd:
+                    raise Exception('未找到已登录的微信主窗口')
                 self._setup_ui(hwnd)
-                if self.control.ClassName == self._ui_cls_name:
-                    break
-                elif index+1 == len(wxs):
-                    raise Exception(f'未找到微信窗口：{nickname}')
+                wxs = []
+            else:
+                for index, (hwnd, clsname, winname) in enumerate(wxs):
+                    self._setup_ui(hwnd)
+                    if self.control.ClassName == self._ui_cls_name:
+                        break
+                    elif index+1 == len(wxs):
+                        raise Exception(f'未找到微信窗口：{nickname}')
         # if NetErrInfoTipsBarWnd(self):
         #     raise NetWorkError('微信无法连接到网络')
         
@@ -160,7 +191,7 @@ class WeChatMainWnd(WeChatSubWnd):
             sessionbox_control = self.control.\
                 GroupControl(ClassName="mmui::ChatMasterView")
             chatbox_control = self.control.\
-                GroupControl(ClassName="mmui::ChatMessagePage").\
+                GroupControl(AutomationId="chat_message_page", ClassName="mmui::ChatMessagePage").\
                 CustomControl(ClassName="mmui::XSplitterView")
             self._navigation_api = NavigationBox(navigation_control, self)
             self._session_api = SessionBox(sessionbox_control, self)
