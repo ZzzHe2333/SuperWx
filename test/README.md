@@ -1,4 +1,4 @@
-# wxauto4 - WeChat自动化工具
+# superwx_t 测试工具
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-40.1.1-blue.svg" alt="Version">
