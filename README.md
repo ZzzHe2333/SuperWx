@@ -9,6 +9,18 @@
 
 SuperWx_IV 是一个适用于微信4.x客户端的 Python 自动化库，提供微信自动化操作接口，包括消息发送、文件传输等功能。
 
+## 📁 项目结构
+
+```text
+.
+├── wxauto4/          # 核心库代码
+├── examples/         # 示例脚本
+│   ├── demo.py
+│   └── one.py
+├── README.md
+└── pyproject.toml
+```
+
 ## 重要声明
 
 <font color='red'>**目前需要自行适配**</font>
