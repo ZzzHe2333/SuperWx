@@ -7,11 +7,23 @@
   <img src="https://img.shields.io/badge/WeChat-4.0.5-green.svg" alt="WeChat">
 </p>
 
-SuperWx_IV 是一个适用于微信4.x客户端的 Python 自动化库，提供微信自动化操作接口，包括消息发送、文件传输等功能。
+SuperWx_IV 是一个适用于微信4.1.7.30客户端的 Python 自动化库，提供微信自动化操作接口，包括消息发送、文件传输等功能。
 
 ## 重要声明
 
 <font color='red'>**目前需要自行适配**</font>
+
+## 📁 项目结构
+
+```text
+.
+├── wxauto4/          # 核心库代码
+├── examples/         # 示例脚本
+│   ├── demo.py
+│   └── one.py
+├── README.md
+└── pyproject.toml
+```
 
 
 ## 🚀 快速开始
