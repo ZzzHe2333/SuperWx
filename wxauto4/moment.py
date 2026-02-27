@@ -20,6 +20,57 @@ from wxauto4.logger import wxlog
 from wxauto4.param import WxParam, WxResponse
 from wxauto4.ui.base import BaseUISubWnd
 from wxauto4.utils.tools import find_all_windows_from_root
+from wxauto4.utils import win32
+
+
+def _rect_of(ctrl: uia.Control):
+    """返回控件屏幕矩形 (l,t,r,b)，失败则 None。"""
+    try:
+        r = ctrl.BoundingRectangle
+        return int(r.left), int(r.top), int(r.right), int(r.bottom)
+    except Exception:
+        return None
+
+
+def _rect_ok(rect) -> bool:
+    if not rect:
+        return False
+    l, t, r, b = rect
+    if r <= l or b <= t:
+        return False
+    # 过滤异常坐标
+    if min(l, t, r, b) < -1000:
+        return False
+    if max(l, t, r, b) > 100000:
+        return False
+    return True
+
+
+def _dist_point_to_rect(rect, x: int, y: int) -> float:
+    l, t, r, b = rect
+    dx = 0 if l <= x <= r else (l - x if x < l else x - r)
+    dy = 0 if t <= y <= b else (t - y if y < t else y - b)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _bfs_find_all(root: uia.Control, pred, max_nodes: int = 260000, max_hits: int = 2000):
+    """轻量 BFS：返回满足 pred 的控件列表。"""
+    from collections import deque
+
+    q = deque([root])
+    seen = 0
+    hits = []
+    while q and seen < max_nodes and len(hits) < max_hits:
+        cur = q.popleft()
+        seen += 1
+        try:
+            if pred(cur):
+                hits.append(cur)
+            for ch in cur.GetChildren():
+                q.append(ch)
+        except Exception:
+            pass
+    return hits
 
 
 def _lang(key: str) -> str:
@@ -452,6 +503,210 @@ class Moment:
         if not dialog.exists(0.5):
             return WxResponse.failure('未弹出评论窗口')
         return dialog.send(content)
+
+
+    # ------------------------------------------------------------------------------------------
+    # 新版朋友圈：点赞（SNSWindow 内嵌“赞/评论”浮层）
+    #
+    # 适配你这版微信的 UIA 结构：
+    # - 朋友圈是独立窗口：class='mmui::SNSWindow' aid='SNSWindow'
+    # - 每条动态底部有一条“很浅的灰线”（UIA 中表现为 ListItemControl: mmui::TimelineCommentCell，高度 1~3px）
+    # - 点灰线附近的“...”热点后，会在 SNSWindow 内出现 ButtonControl(name='赞') / ButtonControl(name='评论')
+    #
+    # 注意：Qt/mmui 的 ButtonControl.Click() 有时不会触发，因此这里默认走 Win32 真实鼠标点击。
+    # ------------------------------------------------------------------------------------------
+
+    def _find_sns_window(self, timeout: float = 5.0) -> Optional[uia.Control]:
+        """获取朋友圈独立窗口（SNSWindow）。"""
+        t0 = time.time()
+        while time.time() - t0 <= timeout:
+            wins = find_all_windows_from_root(pid=self._api.pid)
+            for w in wins:
+                try:
+                    if getattr(w, 'ControlTypeName', '') != 'WindowControl':
+                        continue
+                    if getattr(w, 'ClassName', '') == 'mmui::SNSWindow' or getattr(w, 'AutomationId', '') == 'SNSWindow' or getattr(w, 'Name', '') == _lang('朋友圈'):
+                        return w
+                except Exception:
+                    continue
+            time.sleep(0.1)
+        return None
+
+    def _find_comment_separators(self, sns: uia.Control):
+        """找灰色分割线（TimelineCommentCell）。返回 [(y, l, t, r, b, ctrl), ...]"""
+        seps = _bfs_find_all(
+            sns,
+            lambda c: getattr(c, 'ControlTypeName', '') == 'ListItemControl' and getattr(c, 'ClassName', '') == 'mmui::TimelineCommentCell',
+            max_nodes=260000,
+            max_hits=2000,
+        )
+        out = []
+        for s in seps:
+            rect = _rect_of(s)
+            if not _rect_ok(rect):
+                continue
+            l, t, r, b = rect
+            w, h = r - l, b - t
+            if w >= 280 and h <= 3:
+                out.append((t, l, t, r, b, s))
+        out.sort(key=lambda x: x[0])
+        return out
+
+    def _click_more_hotspot(self, sep_row, x_ratio: float = 0.92, y_offset_up: int = 16):
+        """点击“...”热点（靠右，略高于灰线）。返回 (x,y)"""
+        _, l, t, r, _, _ = sep_row
+        x = int(l + (r - l) * x_ratio)
+        y = int(t - y_offset_up)
+        win32.Click(uia.Rect(x, y, x + 1, y + 1))  # 复用 win32.Click：传一个 1x1 的 rect
+        time.sleep(0.22)
+        return x, y
+
+    def _find_like_panel_controls_near(self, sns: uia.Control, click_x: int, click_y: int, radius: int = 340):
+        """在 SNSWindow 内，找点击点附近出现的 赞/取消/评论 控件。"""
+        hits = []
+        q = [sns]
+        seen = 0
+        while q and seen < 200000 and len(hits) < 80:
+            cur = q.pop(0)
+            seen += 1
+            try:
+                n = (getattr(cur, 'Name', '') or '').strip()
+                if n in (_lang('赞'), _lang('取消'), _lang('评论')):
+                    rect = _rect_of(cur)
+                    if _rect_ok(rect) and _dist_point_to_rect(rect, click_x, click_y) <= radius:
+                        hits.append(cur)
+                q.extend(cur.GetChildren())
+            except Exception:
+                pass
+        return hits
+
+    def _pick_like_button(self, ctrls: List[uia.Control], cancel: bool = False) -> Optional[uia.Control]:
+        """优先找 ButtonControl(name='赞'|'取消', class='mmui::XButton')。"""
+        target = _lang('取消') if cancel else _lang('赞')
+        for c in ctrls:
+            try:
+                if getattr(c, 'ControlTypeName', '') == 'ButtonControl' and getattr(c, 'Name', '') == target and getattr(c, 'ClassName', '') == 'mmui::XButton':
+                    return c
+            except Exception:
+                continue
+        for c in ctrls:
+            try:
+                if getattr(c, 'Name', '') == target:
+                    return c
+            except Exception:
+                continue
+        return None
+
+    def _click_control_center_win32(self, ctrl: uia.Control) -> bool:
+        rect = _rect_of(ctrl)
+        if not _rect_ok(rect):
+            return False
+        l, t, r, b = rect
+        cx, cy = (l + r) // 2, (t + b) // 2
+        win32.Click(uia.Rect(cx, cy, cx + 1, cy + 1))
+        return True
+
+    def _verify_after_like(self, sns: uia.Control, click_x: int, click_y: int, radius: int = 340, timeout: float = 1.0) -> bool:
+        """点完赞后验证：附近出现“取消”（已赞）或“赞”消失。"""
+        end = time.time() + timeout
+        while time.time() < end:
+            ctrls = self._find_like_panel_controls_near(sns, click_x, click_y, radius=radius)
+            names = {getattr(c, 'Name', '') for c in ctrls}
+            if _lang('取消') in names:
+                return True
+            if _lang('赞') not in names:
+                return True
+            time.sleep(0.08)
+        return False
+
+    def LikeLatest(self, n: int = 1, cancel: bool = False, max_pages: int = 10) -> WxResponse:
+        """给最新 n 条朋友圈点赞（或取消赞）。
+
+        说明：此方法适配你这版“SNSWindow 内嵌赞/评论浮层”。
+
+        Args:
+            n: 目标条数。
+            cancel: True 则点“取消”，用于取消已赞。
+            max_pages: 最多翻页次数（滚动加载）。
+
+        Returns:
+            WxResponse
+        """
+
+        try:
+            self._wx.SwitchToMoments()
+            time.sleep(0.2)
+        except Exception:
+            pass
+
+        sns = self._find_sns_window(timeout=6.0)
+        if not sns:
+            return WxResponse.failure('未找到朋友圈窗口（SNSWindow）')
+
+        # 轻微滚动，确保动态控件生成
+        try:
+            rect = _rect_of(sns)
+            if _rect_ok(rect):
+                l, t, r, b = rect
+                cx, cy = (l + r) // 2, (t + b) // 2
+                win32.set_cursor_pos(cx, cy)
+                time.sleep(0.05)
+                # 复用 win32api 的滚轮（如果你环境没装 pywin32，会在 win32 模块里报错；wxauto4 本身依赖它）
+                try:
+                    import win32api, win32con
+                    for _ in range(2):
+                        win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)
+                        time.sleep(0.2)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        success = 0
+        tried = 0
+
+        for _page in range(max_pages):
+            seps = self._find_comment_separators(sns)
+            if not seps:
+                # 继续滚动加载
+                try:
+                    import win32api, win32con
+                    win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 6, 0)
+                except Exception:
+                    pass
+                time.sleep(0.6)
+                continue
+
+            for sep in seps:
+                if success >= n:
+                    break
+                tried += 1
+                click_x, click_y = self._click_more_hotspot(sep)
+                ctrls = self._find_like_panel_controls_near(sns, click_x, click_y, radius=340)
+                btn = self._pick_like_button(ctrls, cancel=cancel)
+                if not btn:
+                    continue
+                if not self._click_control_center_win32(btn):
+                    continue
+                time.sleep(0.22)
+                if self._verify_after_like(sns, click_x, click_y, radius=340, timeout=1.0):
+                    success += 1
+                time.sleep(0.55)
+
+            if success >= n:
+                break
+
+            # 下一页
+            try:
+                import win32api, win32con
+                win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 6, 0)
+            except Exception:
+                pass
+            time.sleep(0.7)
+
+        if success <= 0:
+            return WxResponse.failure(f'点赞失败（success=0, tried={tried}）')
+        return WxResponse.success(f'操作成功（success={success}/{n}, tried={tried}）')
 
 
 class MomentActionMenu(BaseUISubWnd):
