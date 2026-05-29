@@ -103,11 +103,11 @@ class ChatBox(BaseUISubWnd):
 
     def refresh_send_button(self):
         """Re-locate the send button (may only appear after text is entered)."""
-        self.sendbtn = find_first(self.control, SELECTORS["send_button"], search_depth=30)
+        self.sendbtn = find_first(self.control, "send_button", search_depth=30)
         if not ctrl_exists(self.sendbtn):
             # Fallback: search from input_view if available
             if hasattr(self, "input_view") and ctrl_exists(self.input_view):
-                self.sendbtn = find_first(self.input_view, SELECTORS["send_button"], search_depth=30)
+                self.sendbtn = find_first(self.input_view, "send_button", search_depth=30)
         return self.sendbtn
 
     def init(self):
@@ -225,6 +225,7 @@ class ChatBox(BaseUISubWnd):
 
         self.sendbtn.Click()
         time.sleep(0.3)
+        return WxResponse.success()
 
     def input_at(self, at_list):
         if isinstance(at_list, str):

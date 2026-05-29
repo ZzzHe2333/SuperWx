@@ -45,10 +45,9 @@ def main():
     print(f"[OK] ChatWith returned: {result}")
 
     # 3. Verify controls after switch
-    chat_page = wx.ChatBox.control.GroupControl(
-        AutomationId="chat_message_page", ClassName="mmui::ChatMessagePage"
-    ) or wx.ChatBox.control.GroupControl(AutomationId="chat_message_page")
-    page_ok = ctrl_exists(chat_page)
+    # Note: ChatBox.control is XSplitterView, its parent is ChatMessagePage.
+    parent = wx.ChatBox.control.GetParentControl()
+    page_ok = ctrl_exists(parent) and getattr(parent, 'AutomationId', '') == 'chat_message_page'
     print(f"[{'OK' if page_ok else 'FAIL'}] chat_message_page: {page_ok}")
 
     msg_ok = ctrl_exists(wx.ChatBox.msgbox)
