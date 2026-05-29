@@ -1,0 +1,87 @@
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 11：媒体与消息动作
+
+目标：
+实现图片、视频、文件、链接、引用消息等操作。
+
+修改/新增文件：
+1. wxauto4/msgs/actions.py
+2. wxauto4/msgs/media.py
+3. tests/test_media_actions_module11.py
+
+功能规划：
+1. Message.click()
+2. Message.select_option(option)
+3. Message.forward(targets, message=None)
+4. Message.quote(text, at=None)
+5. ImageMessage.download(path=None)
+6. ImageMessage.ocr()
+7. VideoMessage.download(path=None)
+8. FileMessage.download(path=None)
+9. VoiceMessage.to_text()
+10. LinkMessage.get_url()
+11. NoteMessage.get_content()
+12. NoteMessage.to_markdown()
+13. NoteMessage.save_files()
+
+默认策略：
+1. download 默认保存到 DEFAULT_SAVE_PATH。
+2. forward 默认 dry_run。
+3. quote 默认 dry_run。
+4. 右键菜单操作失败要保存 dump。
+
+测试：
+python tests/test_media_actions_module11.py
+
+验收：
+可识别媒体消息
+可点击消息
+dry_run 能显示将执行的右键菜单动作

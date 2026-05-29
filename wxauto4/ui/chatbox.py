@@ -16,6 +16,7 @@ from .base import (
     BaseUISubWnd
 )
 from wxauto4.msgs.msg import parse_msg
+from wxauto4.locator import find_first, ctrl_exists, SELECTORS
 
 import time
 import os
@@ -100,6 +101,15 @@ class ChatBox(BaseUISubWnd):
         if not self.editbox.HasKeyboardFocus:
             self.editbox.MiddleClick()
 
+    def refresh_send_button(self):
+        """Re-locate the send button (may only appear after text is entered)."""
+        self.sendbtn = find_first(self.control, SELECTORS["send_button"], search_depth=30)
+        if not ctrl_exists(self.sendbtn):
+            # Fallback: search from input_view if available
+            if hasattr(self, "input_view") and ctrl_exists(self.input_view):
+                self.sendbtn = find_first(self.input_view, SELECTORS["send_button"], search_depth=30)
+        return self.sendbtn
+
     def init(self):
         # Prefer stable AutomationId selectors (newer WeChat versions expose them)
         # Message list
@@ -161,6 +171,9 @@ class ChatBox(BaseUISubWnd):
             menu.select('粘贴')
             if self.editbox.GetValuePattern().Value.replace('￼', '').strip():
                 break
+        time.sleep(0.2)
+        # Re-locate send button after text is entered (it may only appear now)
+        self.refresh_send_button()
         t0 = time.time()
         while self.editbox.GetValuePattern().Value:
             if time.time() - t0 > 10:
@@ -168,6 +181,7 @@ class ChatBox(BaseUISubWnd):
             self._activate_editbox()
 
             self.sendbtn.Click()
+            time.sleep(0.3)
             if not self.editbox.GetValuePattern().Value:
                 return WxResponse.success(f"success")
             elif not self.editbox.GetValuePattern().Value.replace('￼', '').strip():
@@ -191,12 +205,26 @@ class ChatBox(BaseUISubWnd):
         if isinstance(file_path, str):
             file_path = [file_path]
         file_path = [os.path.abspath(f) for f in file_path]
-        
+
+        # Validate all files exist
+        for fp in file_path:
+            if not os.path.exists(fp):
+                return WxResponse.failure(f"文件不存在: {fp}")
+
         self.clear_edit()
 
         SetClipboardFiles(file_path)
+        self.editbox.Click()
         self.editbox.SendKeys('{Ctrl}v')
+        time.sleep(0.5)  # wait for file card to render
+
+        # Re-locate send button after file is pasted
+        self.refresh_send_button()
+        if not ctrl_exists(self.sendbtn):
+            return WxResponse.failure("粘贴文件后未找到发送按钮")
+
         self.sendbtn.Click()
+        time.sleep(0.3)
 
     def input_at(self, at_list):
         if isinstance(at_list, str):

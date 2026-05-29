@@ -1,0 +1,91 @@
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 14：OpenClaw / Hermes-Agent Skill 层
+
+目标：
+把 wxauto4 REST API 封装成 OpenClaw / Hermes-Agent 可调用技能。
+
+新增文件：
+1. openclaw_skill/manifest.json
+2. openclaw_skill/skill.py
+3. openclaw_skill/README.md
+4. openclaw_skill/examples.md
+5. tests/test_openclaw_skill_module14.py
+
+技能能力：
+1. 发微信给某人/某群
+2. 获取当前聊天消息
+3. 获取最近会话
+4. 切换聊天
+5. 发送文件
+6. 开始监听
+7. 停止监听
+8. 获取下一条新消息
+9. doctor 检查
+
+示例自然语言：
+- 发微信给文件传输助手说你好
+- 查看当前聊天最近 10 条消息
+- 把这个文件发给某个群
+- 监听某个群，有新消息时提醒我
+- 检查微信自动化状态
+
+安全要求：
+1. 默认本地调用 127.0.0.1 REST API。
+2. 不保存聊天内容到远程。
+3. 发消息前可配置是否二次确认。
+4. 高风险操作必须 confirm。
+
+测试：
+python tests/test_openclaw_skill_module14.py
+
+验收：
+skill 能连接 REST API
+status / send dry_run / get_messages 可用

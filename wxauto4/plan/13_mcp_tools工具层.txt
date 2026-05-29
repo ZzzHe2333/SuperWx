@@ -1,0 +1,92 @@
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 13：MCP 工具层
+
+目标：
+把 wxauto4 REST API 封装成 MCP tools，给 Claude Desktop / Claude Code / 本地 Agent 使用。
+
+新增文件：
+1. wxauto4_mcp/server.py
+2. wxauto4_mcp/tools.py
+3. wxauto4_mcp/config.example.json
+4. tests/test_mcp_tools_module13.py
+
+规划工具：
+1. wechat_initialize
+2. wechat_status
+3. get_my_info
+4. get_sessions
+5. switch_chat
+6. send_message
+7. send_files
+8. get_messages
+9. get_next_new_message
+10. add_listen_chat
+11. remove_listen_chat
+12. start_listening
+13. stop_listening
+14. get_recent_groups
+15. get_chat_info
+16. doctor
+
+工具策略：
+1. MCP 不直接操作 UI。
+2. MCP 调用 REST API。
+3. 发送类工具默认 dry_run=false 还是 true 由配置决定，建议默认 true。
+4. 高风险工具必须 confirm。
+
+测试：
+python tests/test_mcp_tools_module13.py
+
+验收：
+MCP server 可启动
+工具列表可返回
+status / sessions / get_messages 可调用
+send_message 支持 dry_run

@@ -24,8 +24,7 @@ class SessionBox:
         self.init()
 
     def init(self):
-        # Search box / session list selectors changed across WeChat builds.
-        # Keep legacy selectors but add robust fallbacks.
+        # Search box — try XSearchField group first, then name/class fallbacks
         self.searchbox = (
             self.control.GroupControl(ClassName="mmui::XSearchField").EditControl()
             or self.control.EditControl(Name="搜索")
@@ -33,8 +32,11 @@ class SessionBox:
             or self.control.EditControl()
         )
 
+        # Session list — try AutomationId first (WeChat 4.x), then legacy selectors
         self.session_list = (
-            self.control.GroupControl(ClassName="mmui::ChatSessionList").ListControl(ClassName="mmui::XTableView", Name="会话")
+            self.control.ListControl(AutomationId="session_list")
+            or self.control.ListControl(ClassName="mmui::XTableView")
+            or self.control.GroupControl(ClassName="mmui::ChatSessionList").ListControl(ClassName="mmui::XTableView", Name="会话")
             or self.control.ListControl()  # fallback: the first list under session area
         )
 
@@ -77,13 +79,13 @@ class SessionBox:
     
     def switch_chat(
         self,
-        keywords: str, 
+        keywords: str,
         exact: bool = True,
         force: bool = False,
         force_wait: Union[float, int] = 0.5
     ):
         wxlog.debug(f"切换聊天窗口: {keywords}, {exact}, {force}, {force_wait}")
-        # Fast path: click session item directly by AutomationId (newer WeChat uses session_item_<chatname>)
+        # Fast path 1: click session item directly by AutomationId (newer WeChat uses session_item_<chatname>)
         try:
             direct = (
                 self.parent.control.ListItemControl(AutomationId=f"session_item_{keywords}")
@@ -92,6 +94,22 @@ class SessionBox:
             if direct and direct.Exists(0):
                 direct.Click()
                 return keywords
+        except Exception:
+            pass
+
+        # Fast path 2: scan visible session list items by name
+        try:
+            if self.session_list.Exists(0):
+                for item in self.session_list.GetChildren():
+                    item_name = (item.Name or '').split('\n')[0].strip()
+                    if exact:
+                        if item_name == keywords:
+                            item.Click()
+                            return keywords
+                    else:
+                        if keywords in item_name:
+                            item.Click()
+                            return item_name
         except Exception:
             pass
 

@@ -1,0 +1,4 @@
+# Ignore generated dump/report/patch files but keep the directories
+*
+!.gitignore
+!.gitkeep

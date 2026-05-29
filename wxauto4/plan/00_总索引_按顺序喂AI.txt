@@ -1,0 +1,36 @@
+# wxauto4 AI 改造阶段索引
+
+请按以下顺序一个一个喂给 AI / Codex / Cursor，不要跳阶段。
+
+01_新增_locator层和probe脚本.txt
+目标：只新增通用 locator 层和 probe 验证脚本，不改业务逻辑。
+
+02_接入chatbox定位逻辑.txt
+目标：把 locator 接入 wxauto4/ui/chatbox.py，让 ChatBox 能稳定找到消息列表、输入框、发送按钮。
+
+03_修复SendMsg发送文本.txt
+目标：修复文本发送逻辑，输入文本后重新定位发送按钮，只点击真正“发送”按钮。
+
+04_修复SendFiles发送文件.txt
+目标：修复文件发送流程，粘贴文件后点击真正“发送”按钮。
+
+05_修复消息读取和监听.txt
+目标：基于 chat_message_list 读取消息、去重、监听新消息。
+
+06_修复ChatWith会话切换.txt
+目标：基于 session_list 和搜索框实现聊天切换。
+
+07_增加doctor和回归测试.txt
+目标：新增 doctor 命令、手动测试脚本和完整回归流程。
+
+08_AI自修复UI变化机制.txt
+目标：实现 UI dump、selector 热更新、AI 生成补丁、测试通过后应用。
+
+建议每个阶段都单独提交一次 git commit，例如：
+git add .
+git commit -m "stage01 add locator probe"
+
+每阶段开始前先备份：
+git status
+git branch
+git checkout -b ai-wxauto4-stage-XX

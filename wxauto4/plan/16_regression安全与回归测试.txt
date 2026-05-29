@@ -1,0 +1,100 @@
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 16：安全策略与回归测试
+
+目标：
+建立完整回归测试和安全约束，防止 AI 修改代码时破坏核心功能或做危险操作。
+
+新增文件：
+1. tests/regression_all.py
+2. tests/safety_check.py
+3. tests/manual_checklist.md
+4. scripts/run_regression.bat
+5. scripts/run_regression.ps1
+
+回归测试顺序：
+1. locator probe
+2. core init
+3. chatbox locator
+4. SendMsg dry_run
+5. SendFiles dry_run
+6. GetAllMessage
+7. listener dry_run
+8. ChatWith dry_run
+9. REST API health
+10. doctor
+
+safety_check.py 检查：
+1. 是否改了 auth/license。
+2. 是否引入 eval/exec/os.system。
+3. 是否新增对外上传聊天内容。
+4. 是否删除旧 fallback。
+5. 是否默认真实发送消息。
+6. 是否默认真实加好友/改群/发朋友圈。
+
+manual_checklist.md：
+- 微信是否打开
+- 是否进入具体聊天
+- 输入框是否有文字
+- 是否确认发送测试对象
+- 是否开启 dry_run
+- 是否备份 git branch
+
+运行命令：
+python tests/safety_check.py
+python tests/regression_all.py
+
+或：
+scripts/run_regression.ps1
+
+验收：
+所有 dry_run 测试通过
+safety_check 无高风险
+真实发送类测试需要人工显式确认

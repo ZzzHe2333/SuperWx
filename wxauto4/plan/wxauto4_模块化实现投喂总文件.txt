@@ -1,0 +1,1681 @@
+
+
+========================================================================================================================
+00_模块索引_按顺序喂AI.txt
+========================================================================================================================
+
+# wxauto4 模块化实现索引
+
+建议按下面顺序喂给本地 AI / Codex / Cursor，每次只喂一个模块文件。
+
+01_locator定位层.txt
+目标：建立统一 selector 和定位引擎。
+
+02_core_WeChat与ChatBox基础接入.txt
+目标：让 WeChat / ChatBox 稳定初始化并定位核心控件。
+
+03_sendmsg_sendfiles发送能力.txt
+目标：实现文本和文件发送。
+
+04_message_model消息对象模型.txt
+目标：设计统一 Message 对象结构。
+
+05_message_parser消息解析.txt
+目标：解析文本、图片、文件、语音、引用等消息。
+
+06_listener监听系统.txt
+目标：实现 AddListenChat / StartListening / StopListening / GetNextNewMessage。
+
+07_session_chatwith会话切换.txt
+目标：实现 GetSession / ChatWith / SwitchToChat / SwitchToContact。
+
+08_history_message历史消息.txt
+目标：实现滚动读取历史消息。
+
+09_friend好友管理.txt
+目标：规划并实现好友详情、好友申请、加好友、备注标签等能力。
+
+10_group群聊管理.txt
+目标：规划并实现群列表、群成员、群名、群公告、群昵称、@所有人等能力。
+
+11_media_actions媒体与消息动作.txt
+目标：实现图片/文件下载、引用回复、转发、右键菜单等能力。
+
+12_rest_api_HTTP服务.txt
+目标：用 FastAPI 暴露本地 HTTP API。
+
+13_mcp_tools工具层.txt
+目标：实现 MCP 工具 schema 和调用逻辑。
+
+14_openclaw_skill技能层.txt
+目标：把 REST API 封装成 OpenClaw / Hermes-Agent 可调用 skill。
+
+15_doctor_ui自修复.txt
+目标：实现 doctor、UI dump、repair_context、patch_guard。
+
+16_regression安全与回归测试.txt
+目标：统一测试、dry_run、安全策略、回滚机制。
+
+推荐每个模块完成后提交一次：
+git add .
+git commit -m "moduleXX description"
+
+每个模块开始前：
+git status
+git checkout -b ai-wxauto4-module-XX
+
+========================================================================================================================
+01_locator定位层.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 01：locator 定位层
+
+目标：
+建立统一 UI selector 和定位引擎，后续所有模块都从 locator 层查找控件，不再把 selector 散落在业务代码中。
+
+新增文件：
+1. wxauto4/locator/__init__.py
+2. wxauto4/locator/selectors.py
+3. wxauto4/locator/engine.py
+4. tests/probe_wechat_locator.py
+
+selectors.py 要包含 SELECTORS：
+
+SELECTORS = {
+    "main_window": [
+        {"method": "WindowControl", "ClassName": "mmui::MainWindow"},
+        {"method": "WindowControl", "Name": "微信"},
+        {"method": "WindowControl", "Name": "Weixin"},
+        {"method": "WindowControl", "Name": "WeChat"},
+    ],
+    "chat_message_page": [
+        {"method": "GroupControl", "AutomationId": "chat_message_page", "ClassName": "mmui::ChatMessagePage"},
+        {"method": "GroupControl", "AutomationId": "chat_message_page"},
+        {"method": "GroupControl", "ClassName": "mmui::ChatMessagePage"},
+    ],
+    "message_view": [
+        {"method": "GroupControl", "ClassName": "mmui::MessageView"},
+    ],
+    "chat_message_list": [
+        {"method": "ListControl", "AutomationId": "chat_message_list", "ClassName": "mmui::RecyclerListView"},
+        {"method": "ListControl", "AutomationId": "chat_message_list"},
+        {"method": "ListControl", "ClassName": "mmui::RecyclerListView"},
+    ],
+    "input_view": [
+        {"method": "GroupControl", "ClassName": "mmui::InputView"},
+    ],
+    "chat_input_field": [
+        {"method": "EditControl", "AutomationId": "chat_input_field", "ClassName": "mmui::ChatInputField"},
+        {"method": "EditControl", "AutomationId": "chat_input_field"},
+        {"method": "EditControl", "ClassName": "mmui::ChatInputField"},
+    ],
+    "send_button": [
+        {"method": "ButtonControl", "Name": "发送", "ClassName": "mmui::XOutlineButton"},
+        {"method": "ButtonControl", "Name": "发送"},
+        {"method": "ButtonControl", "Name": "发送(S)"},
+        {"method": "ButtonControl", "Name": "Send"},
+    ],
+    "session_list": [
+        {"method": "ListControl", "AutomationId": "session_list"},
+        {"method": "ListControl", "ClassName": "mmui::XTableView"},
+    ],
+    "search_box": [
+        {"method": "EditControl", "Name": "搜索", "ClassName": "mmui::XValidatorTextEdit"},
+        {"method": "EditControl", "Name": "搜索"},
+        {"method": "EditControl", "ClassName": "mmui::XValidatorTextEdit"},
+    ],
+}
+
+engine.py 必须实现：
+1. safe_get(ctrl, attr, default="")
+2. safe_bool(ctrl, attr, default=None)
+3. rect_to_dict(ctrl)
+4. ctrl_exists(ctrl)
+5. try_find(root, method_name, search_depth=30, **kwargs)
+6. find_first(root, selectors, search_depth=30)
+7. find_wechat_window()
+8. describe_control(ctrl)
+9. find_target(root, name, search_depth=30)，内部读取 SELECTORS[name]
+
+tests/probe_wechat_locator.py：
+- 不发送消息
+- 不点击发送按钮
+- 只检测控件是否存在
+- 输出 TXT 报告
+- 输出每个控件的 Name/ClassName/AutomationId/ControlType/Rect
+
+测试命令：
+python tests/probe_wechat_locator.py
+
+验收：
+main_window          OK
+chat_message_page    OK
+message_view         OK
+chat_message_list    OK
+input_view           OK
+chat_input_field     OK
+send_button          OK 或提示输入文字后重试
+session_list         OK
+
+========================================================================================================================
+02_core_WeChat与ChatBox基础接入.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 02：WeChat 与 ChatBox 基础接入
+
+目标：
+把 locator 层接入主窗口和聊天窗口初始化，使 WeChat() 能稳定获得当前聊天页核心控件。
+
+修改文件：
+1. wxauto4/ui/main.py
+2. wxauto4/ui/chatbox.py
+3. wxauto4/ui/sessionbox.py
+4. tests/test_core_init_module02.py
+
+main.py 要求：
+1. 主窗口查找支持 ClassName=mmui::MainWindow。
+2. 支持窗口名 微信 / Weixin / WeChat。
+3. 不要只依赖窗口标题。
+4. _setup_ui 中优先定位：
+   - navigation: MainView.main_tabbar / mmui::MainTabBar
+   - session_list: AutomationId=session_list
+   - chat_page: chat_message_page
+
+chatbox.py 要求：
+1. ChatBox.init() 使用 locator。
+2. 初始化：
+   - self.chat_page
+   - self.message_view
+   - self.msgbox
+   - self.input_view
+   - self.editbox
+   - self.sendbtn
+   - self.tools
+3. 保留旧逻辑 fallback。
+4. sendbtn 找不到时不报错，因为输入框为空时按钮可能不显示。
+5. msgbox 和 editbox 必须尽可能成功。
+
+sessionbox.py 要求：
+1. 优先使用 session_list。
+2. 支持 ClassName=mmui::XTableView。
+3. 支持会话 item：mmui::ChatSessionCell。
+
+测试脚本 tests/test_core_init_module02.py：
+1. 初始化 WeChat。
+2. 打印主窗口状态。
+3. 打印 ChatBox 控件状态。
+4. 打印 SessionBox 控件状态。
+5. 不发送消息。
+
+测试命令：
+python tests/probe_wechat_locator.py
+python tests/test_core_init_module02.py
+
+验收：
+WeChat 初始化成功
+chat_message_page OK
+chat_message_list OK
+chat_input_field OK
+session_list OK
+
+========================================================================================================================
+03_sendmsg_sendfiles发送能力.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 03：SendMsg / SendFiles 发送能力
+
+目标：
+实现稳定文本发送和文件发送。
+
+修改文件：
+1. wxauto4/ui/chatbox.py
+2. wxauto4/utils/clipboard.py 或复用现有剪贴板工具
+3. tests/test_sendmsg_module03.py
+4. tests/test_sendfiles_module03.py
+
+SendMsg 要求：
+1. 确认 editbox 存在。
+2. 点击 editbox。
+3. clear=True 时执行 Ctrl+A。
+4. 使用 pyperclip.copy(msg)。
+5. editbox.SendKeys("{Ctrl}v")。
+6. 输入后重新定位 send_button。
+7. 只允许点击 Name="发送" 的按钮。
+8. 不允许点击：
+   - 发送表情(Alt+E)
+   - 发送文件
+   - 发送收藏
+9. 发送后等待 0.2~0.5 秒。
+10. 失败时抛出 WxautoUINotFoundError 或返回明确错误。
+
+必须新增辅助方法：
+refresh_send_button()
+is_real_send_button(btn)
+
+is_real_send_button(btn) 逻辑：
+- btn.Name == "发送"
+- btn.ClassName in ["mmui::XOutlineButton", ""]
+- 排除 name 包含：发送表情、发送文件、发送收藏
+
+SendFiles 要求：
+1. 支持单文件和文件列表。
+2. 检查文件是否存在。
+3. 使用剪贴板写入文件列表。
+4. 点击 editbox。
+5. Ctrl+V 粘贴。
+6. 等待文件卡片出现。
+7. 重新定位 send_button。
+8. 点击真正“发送”。
+
+测试：
+python tests/test_sendmsg_module03.py
+python tests/test_sendmsg_module03.py --send
+python tests/test_sendfiles_module03.py
+python tests/test_sendfiles_module03.py --send-file
+
+默认 dry_run，不真实发送。
+
+========================================================================================================================
+04_message_model消息对象模型.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 04：Message 消息对象模型
+
+目标：
+建立统一消息对象，为后续消息解析、监听、下载、转发提供基础。
+
+修改/新增文件：
+1. wxauto4/msgs/base.py
+2. wxauto4/msgs/types.py
+3. wxauto4/msgs/__init__.py
+4. tests/test_message_model_module04.py
+
+统一消息字段：
+- id
+- runtimeid
+- attr: self / friend / system / other / unknown
+- type: text / image / file / voice / video / link / quote / emotion / card / note / merge / other
+- sender
+- content
+- raw_name
+- class_name
+- automation_id
+- control_type
+- rect
+- created_at
+- raw_control 可选，不建议序列化
+
+基础类：
+Message
+TextMessage
+ImageMessage
+FileMessage
+VoiceMessage
+VideoMessage
+LinkMessage
+QuoteMessage
+EmotionMessage
+PersonalCardMessage
+NoteMessage
+MergeMessage
+OtherMessage
+SystemMessage
+
+每个 Message 至少支持：
+1. to_dict()
+2. __repr__()
+3. click()
+4. raw_text 属性
+
+先不要实现复杂下载、OCR、转发。
+本模块只做对象结构，不做 UI 操作增强。
+
+测试：
+python tests/test_message_model_module04.py
+
+========================================================================================================================
+05_message_parser消息解析.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 05：消息解析
+
+目标：
+从 chat_message_list.GetChildren() 得到的 UI 控件解析成 Message 对象。
+
+修改/新增文件：
+1. wxauto4/msgs/parser.py
+2. wxauto4/ui/chatbox.py
+3. tests/test_message_parser_module05.py
+
+需要识别的 ClassName：
+- mmui::ChatTextItemView -> TextMessage
+- mmui::ChatVoiceItemView -> VoiceMessage
+- mmui::ChatBubbleReferItemView -> ImageMessage / EmotionMessage / OtherMessage
+- 其他 ListItemControl -> OtherMessage
+
+GetAllMessage 要求：
+1. 基于 self.msgbox.GetChildren()
+2. 每个 child 调用 parse_message_safe(child)
+3. 解析失败不影响其他消息
+4. 保留 raw 信息
+5. 返回 Message 对象列表或兼容原格式
+
+parse_message_safe 要求：
+1. 捕获异常
+2. 失败返回 OtherMessage
+3. 包含 error 字段
+
+消息去重 key：
+优先 tuple(runtimeid)
+失败时使用 class_name + name + rect
+
+测试：
+python tests/test_message_parser_module05.py
+
+输出最近 10 条消息：
+- id
+- type
+- attr
+- sender
+- content
+- class_name
+
+========================================================================================================================
+06_listener监听系统.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 06：监听系统
+
+目标：
+实现多聊天监听、新消息去重、callback 分发。
+
+修改/新增文件：
+1. wxauto4/listeners/manager.py
+2. wxauto4/wx.py
+3. wxauto4/ui/chatbox.py
+4. tests/test_listener_module06.py
+
+需要支持的 API：
+- AddListenChat(nickname, callback)
+- RemoveListenChat(nickname)
+- StartListening()
+- StopListening(remove=True)
+- GetNextNewMessage(filter_mute=False, callback=None)
+- KeepRunning()
+
+监听策略：
+1. 每个监听对象保存 nickname、chat 实例、last_msg_ids。
+2. 轮询 chat_message_list。
+3. 使用 runtimeid 去重。
+4. 新消息进入 callback。
+5. callback 异常不能杀死监听线程。
+6. 支持 LISTEN_INTERVAL。
+7. 支持线程池，但默认单线程更稳。
+
+安全要求：
+1. 默认不自动回复。
+2. 自动回复必须由用户 callback 明确实现。
+3. 日志记录每次监听异常。
+
+测试：
+python tests/test_listener_module06.py --listen 10
+
+验收：
+监听 10 秒不崩溃
+新消息不重复
+StopListening 后线程退出
+
+========================================================================================================================
+07_session_chatwith会话切换.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 07：会话切换 ChatWith / GetSession
+
+目标：
+实现稳定获取会话列表和切换聊天。
+
+修改/新增文件：
+1. wxauto4/ui/sessionbox.py
+2. wxauto4/ui/main.py
+3. wxauto4/wx.py
+4. tests/test_session_chatwith_module07.py
+
+GetSession 要求：
+1. 基于 session_list.GetChildren()
+2. 解析 mmui::ChatSessionCell
+3. 返回会话名称、最后消息、时间、是否免打扰、未读数等可读字段
+4. 解析失败返回 raw 信息
+
+ChatWith(who, exact=False) 流程：
+1. 先从当前可见 session_list 查找。
+2. exact=True 时精确匹配。
+3. exact=False 时允许包含匹配。
+4. 找到后点击。
+5. 找不到时使用搜索框：
+   - EditControl(Name="搜索")
+   - ClassName="mmui::XValidatorTextEdit"
+6. 搜索框 Ctrl+A、粘贴 who。
+7. 等待搜索结果。
+8. 点击目标结果。
+9. 切换后重新 init ChatBox。
+10. 验证 chat_message_list 和 chat_input_field 存在。
+
+测试：
+python tests/test_session_chatwith_module07.py
+python tests/test_session_chatwith_module07.py --name "文件传输助手"
+
+默认只切换，不发送。
+
+========================================================================================================================
+08_history_message历史消息.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 08：历史消息读取
+
+目标：
+实现 GetHistoryMessage(n, callback=None, interval=0.5, speed=1, goback=True)。
+
+修改/新增文件：
+1. wxauto4/ui/chatbox.py
+2. wxauto4/msgs/parser.py
+3. tests/test_history_message_module08.py
+
+实现思路：
+1. 当前 msgbox 读取可见消息。
+2. 向上滚动消息列表。
+3. 每次滚动后读取新增消息。
+4. 使用 message id 去重。
+5. 达到 n 条后停止。
+6. callback(message_list) 返回 True 时停止。
+7. goback=True 时滚回原位置或底部。
+
+风险：
+1. UIAutomation 滚动可能不稳定。
+2. 微信可能只加载部分历史。
+3. 时间消息可能是特殊控件。
+4. 不要疯狂滚动，避免卡死。
+
+测试：
+python tests/test_history_message_module08.py --n 50
+
+验收：
+能读取比当前可见更多的历史消息
+不重复
+不崩溃
+
+========================================================================================================================
+09_friend好友管理.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 09：好友管理
+
+目标：
+规划并实现好友详情、好友申请、添加好友、修改备注和标签。
+
+修改/新增文件：
+1. wxauto4/friends/
+2. wxauto4/ui/contactbox.py
+3. tests/test_friend_module09.py
+
+功能规划：
+1. GetMyInfo()
+2. GetFriendDetails(who)
+3. GetNewFriends(acceptable=True, roll_times=0)
+4. AcceptNewFriend(remark=None, tags=None)
+5. AddNewFriend(keyword, verify_msg=None, remark=None, tags=None, permission=None)
+6. EditFriendInfo(who, remark=None, add_tags=None, remove_tags=None)
+
+默认策略：
+1. 所有会修改状态的操作默认 dry_run。
+2. 真实执行必须 --apply。
+3. 不做批量加好友。
+4. 失败时保存 UI dump。
+
+测试：
+python tests/test_friend_module09.py
+python tests/test_friend_module09.py --apply
+
+验收：
+GetMyInfo 可用
+GetFriendDetails 可用
+修改类操作 dry_run 可输出将执行步骤
+
+========================================================================================================================
+10_group群聊管理.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 10：群聊管理
+
+目标：
+实现群聊基础管理能力。
+
+修改/新增文件：
+1. wxauto4/groups/
+2. wxauto4/ui/groupbox.py
+3. tests/test_group_module10.py
+
+功能规划：
+1. GetAllRecentGroups()
+2. CreateGroup(contacts)
+3. AddGroupMembers(members)
+4. AtAll(msg, who=None, exact=False)
+5. SetGroupName(value)
+6. SetGroupRemark(value)
+7. SetGroupAnnouncement(value)
+8. SetGroupMyNickname(value)
+
+默认策略：
+1. 群管理能力默认 dry_run。
+2. 真实改群名/公告/拉人必须 --apply。
+3. AtAll 必须 --confirm。
+4. 不做批量骚扰。
+
+测试：
+python tests/test_group_module10.py
+python tests/test_group_module10.py --apply
+
+验收：
+可读取最近群聊
+dry_run 能输出群管理操作步骤
+真实操作必须人工确认
+
+========================================================================================================================
+11_media_actions媒体与消息动作.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 11：媒体与消息动作
+
+目标：
+实现图片、视频、文件、链接、引用消息等操作。
+
+修改/新增文件：
+1. wxauto4/msgs/actions.py
+2. wxauto4/msgs/media.py
+3. tests/test_media_actions_module11.py
+
+功能规划：
+1. Message.click()
+2. Message.select_option(option)
+3. Message.forward(targets, message=None)
+4. Message.quote(text, at=None)
+5. ImageMessage.download(path=None)
+6. ImageMessage.ocr()
+7. VideoMessage.download(path=None)
+8. FileMessage.download(path=None)
+9. VoiceMessage.to_text()
+10. LinkMessage.get_url()
+11. NoteMessage.get_content()
+12. NoteMessage.to_markdown()
+13. NoteMessage.save_files()
+
+默认策略：
+1. download 默认保存到 DEFAULT_SAVE_PATH。
+2. forward 默认 dry_run。
+3. quote 默认 dry_run。
+4. 右键菜单操作失败要保存 dump。
+
+测试：
+python tests/test_media_actions_module11.py
+
+验收：
+可识别媒体消息
+可点击消息
+dry_run 能显示将执行的右键菜单动作
+
+========================================================================================================================
+12_rest_api_HTTP服务.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 12：RESTful HTTP API 服务
+
+目标：
+用 FastAPI 把 wxauto4 能力暴露成本地 HTTP API，方便 Hermes-Agent、OpenClaw、网页面板调用。
+
+新增文件：
+1. wxauto4/api/__init__.py
+2. wxauto4/api/main.py
+3. wxauto4/api/schemas.py
+4. wxauto4/api/routes/
+5. tests/test_rest_api_module12.py
+
+核心接口：
+GET  /health
+POST /wechat/init
+GET  /wechat/status
+GET  /wechat/me
+GET  /wechat/sessions
+POST /wechat/chat/switch
+POST /wechat/message/send
+POST /wechat/file/send
+GET  /wechat/messages/current
+GET  /wechat/messages/new
+POST /wechat/listen/add
+POST /wechat/listen/remove
+POST /wechat/listen/start
+POST /wechat/listen/stop
+POST /wechat/doctor
+
+返回格式：
+{
+  "ok": true,
+  "data": {},
+  "error": null
+}
+
+安全要求：
+1. 默认只监听 127.0.0.1。
+2. 可选 API token。
+3. 发送类接口支持 dry_run。
+4. 文件路径必须校验存在。
+5. 不允许远程任意文件读取。
+
+启动命令：
+python -m wxauto4.api.main
+
+测试：
+python tests/test_rest_api_module12.py
+
+========================================================================================================================
+13_mcp_tools工具层.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 13：MCP 工具层
+
+目标：
+把 wxauto4 REST API 封装成 MCP tools，给 Claude Desktop / Claude Code / 本地 Agent 使用。
+
+新增文件：
+1. wxauto4_mcp/server.py
+2. wxauto4_mcp/tools.py
+3. wxauto4_mcp/config.example.json
+4. tests/test_mcp_tools_module13.py
+
+规划工具：
+1. wechat_initialize
+2. wechat_status
+3. get_my_info
+4. get_sessions
+5. switch_chat
+6. send_message
+7. send_files
+8. get_messages
+9. get_next_new_message
+10. add_listen_chat
+11. remove_listen_chat
+12. start_listening
+13. stop_listening
+14. get_recent_groups
+15. get_chat_info
+16. doctor
+
+工具策略：
+1. MCP 不直接操作 UI。
+2. MCP 调用 REST API。
+3. 发送类工具默认 dry_run=false 还是 true 由配置决定，建议默认 true。
+4. 高风险工具必须 confirm。
+
+测试：
+python tests/test_mcp_tools_module13.py
+
+验收：
+MCP server 可启动
+工具列表可返回
+status / sessions / get_messages 可调用
+send_message 支持 dry_run
+
+========================================================================================================================
+14_openclaw_skill技能层.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 14：OpenClaw / Hermes-Agent Skill 层
+
+目标：
+把 wxauto4 REST API 封装成 OpenClaw / Hermes-Agent 可调用技能。
+
+新增文件：
+1. openclaw_skill/manifest.json
+2. openclaw_skill/skill.py
+3. openclaw_skill/README.md
+4. openclaw_skill/examples.md
+5. tests/test_openclaw_skill_module14.py
+
+技能能力：
+1. 发微信给某人/某群
+2. 获取当前聊天消息
+3. 获取最近会话
+4. 切换聊天
+5. 发送文件
+6. 开始监听
+7. 停止监听
+8. 获取下一条新消息
+9. doctor 检查
+
+示例自然语言：
+- 发微信给文件传输助手说你好
+- 查看当前聊天最近 10 条消息
+- 把这个文件发给某个群
+- 监听某个群，有新消息时提醒我
+- 检查微信自动化状态
+
+安全要求：
+1. 默认本地调用 127.0.0.1 REST API。
+2. 不保存聊天内容到远程。
+3. 发消息前可配置是否二次确认。
+4. 高风险操作必须 confirm。
+
+测试：
+python tests/test_openclaw_skill_module14.py
+
+验收：
+skill 能连接 REST API
+status / send dry_run / get_messages 可用
+
+========================================================================================================================
+15_doctor_ui自修复.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 15：doctor 与 UI 自修复机制
+
+目标：
+当微信 UI 变化导致自动化失效时，自动检测失败点、dump UI 树、生成 AI 修复上下文。
+
+新增文件：
+1. wxauto4/doctor.py
+2. wxauto4/locator/dump.py
+3. wxauto4/locator/repair_context.py
+4. wxauto4/locator/patch_guard.py
+5. tests/test_doctor_module15.py
+
+新增目录：
+.wxauto4_repair/
+├── dumps/
+├── reports/
+└── patches/
+
+doctor 功能：
+1. 检查 main_window。
+2. 检查 chat_message_page。
+3. 检查 chat_message_list。
+4. 检查 chat_input_field。
+5. 检查 send_button。
+6. 检查 session_list。
+7. 输出 OK / FAILED。
+8. 失败时自动 dump UI 树。
+9. 生成 repair_context.md。
+
+dump.py：
+1. 保存完整 UI 树 JSON。
+2. 保存 TXT 摘要。
+3. 保存失败控件候选列表。
+4. 文件名包含日期时间。
+
+repair_context.md 内容：
+1. 失败控件名称。
+2. 当前旧 selector。
+3. 当前 UI 树摘要。
+4. 候选控件。
+5. 修改限制。
+6. 要求 AI 只输出 unified diff patch。
+
+patch_guard.py：
+允许修改：
+- wxauto4/locator/
+- wxauto4/ui/chatbox.py
+- wxauto4/ui/main.py
+- wxauto4/ui/sessionbox.py
+- tests/
+
+禁止修改：
+- license
+- auth
+- wxauto4/utils/useful.py
+- eval
+- exec
+- os.system
+- 危险 subprocess
+- requests.post 上传聊天内容
+
+测试：
+python -m wxauto4 doctor
+python -m wxauto4 doctor --dump-on-fail
+python tests/test_doctor_module15.py
+
+========================================================================================================================
+16_regression安全与回归测试.txt
+========================================================================================================================
+
+通用背景：
+你正在改造 SuperWx / wxauto4，使其成为一个基于 Windows 微信 4.x UIAutomation 的本地微信 AI 自动化框架。
+当前实测核心控件如下：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name: 微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 禁止用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 禁止把“发送表情”“发送文件”“发送收藏”误判为发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+全局限制：
+1. 不要修改授权、license、auth、加密、激活、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback 或兼容逻辑。
+3. 不要一次性跨模块乱改。
+4. 每个模块完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、是否可以进入下一个模块。
+5. 高风险操作默认 dry_run，不得默认真实发送、加好友、改群、发朋友圈。
+6. 如果无法确认某功能，不要编造，输出检测脚本和失败原因。
+7. 所有测试脚本默认不真实发送、不真实修改微信状态，除非用户显式传 --send、--apply、--confirm。
+
+# 模块 16：安全策略与回归测试
+
+目标：
+建立完整回归测试和安全约束，防止 AI 修改代码时破坏核心功能或做危险操作。
+
+新增文件：
+1. tests/regression_all.py
+2. tests/safety_check.py
+3. tests/manual_checklist.md
+4. scripts/run_regression.bat
+5. scripts/run_regression.ps1
+
+回归测试顺序：
+1. locator probe
+2. core init
+3. chatbox locator
+4. SendMsg dry_run
+5. SendFiles dry_run
+6. GetAllMessage
+7. listener dry_run
+8. ChatWith dry_run
+9. REST API health
+10. doctor
+
+safety_check.py 检查：
+1. 是否改了 auth/license。
+2. 是否引入 eval/exec/os.system。
+3. 是否新增对外上传聊天内容。
+4. 是否删除旧 fallback。
+5. 是否默认真实发送消息。
+6. 是否默认真实加好友/改群/发朋友圈。
+
+manual_checklist.md：
+- 微信是否打开
+- 是否进入具体聊天
+- 输入框是否有文字
+- 是否确认发送测试对象
+- 是否开启 dry_run
+- 是否备份 git branch
+
+运行命令：
+python tests/safety_check.py
+python tests/regression_all.py
+
+或：
+scripts/run_regression.ps1
+
+验收：
+所有 dry_run 测试通过
+safety_check 无高风险
+真实发送类测试需要人工显式确认

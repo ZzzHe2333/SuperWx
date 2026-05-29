@@ -1,0 +1,117 @@
+项目背景：
+你正在改造 SuperWx / wxauto4，使其适配当前 Windows 微信 4.x UI。
+当前已通过 UIAutomation 实测确认以下核心 selector：
+
+main_window:
+- ClassName: mmui::MainWindow
+- Name 可能为：微信 / Weixin / WeChat
+
+chat_message_page:
+- AutomationId: chat_message_page
+- ClassName: mmui::ChatMessagePage
+
+message_view:
+- ClassName: mmui::MessageView
+
+chat_message_list:
+- AutomationId: chat_message_list
+- ClassName: mmui::RecyclerListView
+- Name: 消息
+
+input_view:
+- ClassName: mmui::InputView
+
+chat_input_field:
+- AutomationId: chat_input_field
+- ClassName: mmui::ChatInputField
+- ControlType: EditControl
+- 注意：不要用 Name 定位，因为 Name 会变化
+
+send_button:
+- Name: 发送
+- ClassName: mmui::XOutlineButton
+- ControlType: ButtonControl
+- 注意：不要把“发送表情”“发送文件”“发送收藏”当作发送消息按钮
+
+session_list:
+- AutomationId: session_list
+- ClassName: mmui::XTableView
+- Name: 会话
+
+通用限制：
+1. 不要修改授权、license、auth、加密、网络校验相关代码。
+2. 不要删除旧逻辑，只能新增 fallback。
+3. 不要一次性跨阶段乱改。
+4. 每阶段完成后必须输出：修改了哪些文件、改了什么、测试命令、测试结果、下一阶段是否可继续。
+5. 如果某功能无法确认，不要编造，先输出检测脚本和失败原因。
+
+
+你现在执行第三阶段：修复 SendMsg 文本发送逻辑。
+
+前置条件：
+第二阶段已经完成，ChatBox.init() 能稳定定位 self.msgbox、self.editbox，并能在输入文字后重新定位 self.sendbtn。
+
+本阶段目标：
+让 SendMsg 能可靠发送文本消息。
+
+修改范围：
+- wxauto4/ui/chatbox.py
+- 必要时新增 tests/test_sendmsg_stage3.py
+
+本阶段允许改：
+- SendMsg 相关函数
+- ChatBox 内部重新定位 send_button 的辅助函数
+
+本阶段禁止改：
+1. SendFiles。
+2. 消息监听。
+3. ChatWith。
+4. 授权 / license / auth 相关文件。
+5. 不要用坐标点击作为主方案。
+
+核心要求：
+1. 发送前确认 editbox 存在。
+2. 点击 editbox。
+3. 通过剪贴板粘贴文本，避免 SendKeys 中文输入不稳定。
+4. 输入文本后重新定位 send_button。
+5. 只点击 Name="发送" + ClassName="mmui::XOutlineButton" 或 Name="发送" 的按钮。
+6. 不要点击：发送表情(Alt+E)、发送收藏、发送文件。
+7. 发送后等待 0.2~0.5 秒。
+8. 发送失败时抛出清晰异常或返回明确错误。
+
+建议新增 ChatBox 方法：
+def refresh_send_button(self):
+    self.sendbtn = find_first(self.control, SELECTORS["send_button"], search_depth=30)
+    if not ctrl_exists(self.sendbtn) and hasattr(self, "input_view") and ctrl_exists(self.input_view):
+        self.sendbtn = find_first(self.input_view, SELECTORS["send_button"], search_depth=30)
+    return self.sendbtn
+
+SendMsg 建议流程：
+1. if not ctrl_exists(self.editbox): self.init()
+2. editbox.Click()
+3. clear=True 时 Ctrl+A。
+4. pyperclip.copy(msg)
+5. editbox.SendKeys("{Ctrl}v")
+6. time.sleep(0.2)
+7. refresh_send_button()
+8. 校验 sendbtn.Name == "发送"
+9. sendbtn.Click()
+10. time.sleep(0.3)
+
+新增测试脚本 tests/test_sendmsg_stage3.py：
+1. 默认 dry_run=True，不真实发送。
+2. dry_run 时只验证 editbox 和 send_button。
+3. 传 --send 才真实发送。
+4. 真实发送内容：wxauto4 test 当前时间。
+5. 打印发送前后控件状态。
+
+测试命令：
+python tests/test_sendmsg_stage3.py
+python tests/test_sendmsg_stage3.py --send
+
+完成后输出：
+1. 修改了哪些函数。
+2. SendMsg 当前流程。
+3. dry_run 测试结果。
+4. 真实发送测试是否完成。
+5. 是否可以进入第四阶段。

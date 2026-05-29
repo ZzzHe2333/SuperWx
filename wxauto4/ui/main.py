@@ -20,6 +20,7 @@ import random
 import os
 import re
 import sys
+import time
 
 
 def _find_wechat_main_hwnd_by_uia(ui_name: str = '微信', ui_cls_name: str = 'mmui::MainWindow') -> int:
@@ -211,8 +212,8 @@ class WeChatMainWnd(WeChatSubWnd):
                 return os.path.join(wxdir, d)
 
     def _get_chatbox(
-            self, 
-            nickname: str=None, 
+            self,
+            nickname: str=None,
             exact: bool=False
         ) -> ChatBox:
         if nickname and (chatbox := WeChatSubWnd(nickname, self, timeout=0)).control:
@@ -222,6 +223,8 @@ class WeChatMainWnd(WeChatSubWnd):
                 switch_result = self._session_api.switch_chat(keywords=nickname, exact=exact)
                 if not switch_result:
                     return None
+                time.sleep(0.3)
+                self._chat_api.init()  # re-init chatbox for the new chat
             if self._chat_api.msgbox.Exists(0.5):
                 return self._chat_api
 
