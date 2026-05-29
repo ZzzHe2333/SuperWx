@@ -1,4 +1,111 @@
-*.ipynb
-wxauto_logs
-__pycache__
+# Python cache / test cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / local editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local env / secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.token
+*token*
+*secret*
+*password*
+*apikey*
+*api_key*
+
+# wxauto / license / activation local files
+.wxauto4/
+.wxauto/
+license.json
+license_request.json
+debug_license*
+*.license
+*.lic
+
+# Runtime logs
+wxauto_logs/
+logs/
+*.log
+
+# UI dump / repair artifacts
+ui_dumps/
+.wxauto4_repair/dumps/*
+.wxauto4_repair/reports/*
+.wxauto4_repair/patches/*
+
+# Keep repair directory structure only
+!.wxauto4_repair/.gitignore
+!.wxauto4_repair/dumps/.gitkeep
+!.wxauto4_repair/reports/.gitkeep
+!.wxauto4_repair/patches/.gitkeep
+
+# Local/manual test scripts
+local_tests/
+tests/manual_*.py
+tests/test_sendmsg_*.py
+tests/test_sendfiles_*.py
+tests/test_chatwith_*.py
+tests/regression_*.py
+tests/tmp_*
+tests/*.log
+tests/*.txt
+tests/*.json
+
+# Keep generic public probe test
+!tests/probe_wechat_locator.py
+
+# Generated AI plans / prompts
 wxauto4/plan/
+plan/
+plans/
+*_投喂总文件.txt
+*_stage_prompts.zip
+*_module_prompts.zip
+
+# Runtime screenshots / reports / temp files
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.bmp
+*.tmp
+*.bak
+*.old
+*.zip
+*.7z
+*.rar
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
