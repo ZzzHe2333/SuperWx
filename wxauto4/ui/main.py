@@ -148,7 +148,12 @@ class WeChatSubWnd(BaseUISubWnd):
         if chatbox:
             return chatbox.get_last_msg()
 
-    
+    def get_history_msg(self, n=50, callback=None, interval=0.5, speed=1, goback=True):
+        chatbox = self._get_chatbox()
+        if chatbox:
+            return chatbox.get_history_msg(n, callback, interval, speed, goback)
+        return []
+
 
 class WeChatMainWnd(WeChatSubWnd):
     _ui_cls_name: str = 'mmui::MainWindow'

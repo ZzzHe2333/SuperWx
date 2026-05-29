@@ -192,6 +192,28 @@ class Chat:
 
         return self._api.get_last_msg()
 
+    def GetHistoryMessage(
+            self,
+            n: int = 50,
+            callback: Callable = None,
+            interval: float = 0.5,
+            speed: int = 1,
+            goback: bool = True,
+        ) -> List['Message']:
+        """向上滚动获取历史消息
+
+        Args:
+            n (int): 获取历史消息数量，默认50
+            callback (Callable, optional): 每次滚动后的回调，返回True停止
+            interval (float): 滚动间隔秒数，默认0.5
+            speed (int): 每次滚动行数，默认1
+            goback (bool): 完成后是否滚回底部，默认True
+
+        Returns:
+            List[Message]: 历史消息列表，按时间正序
+        """
+        return self._api.get_history_msg(n, callback, interval, speed, goback)
+
     def Close(self) -> None:
         """关闭微信窗口"""
         self._api.close()

@@ -403,6 +403,98 @@ class ChatBox(BaseUISubWnd):
             return None
         return parse_msg(message_controls[-1], self)
 
+    def get_history_msg(self, n: int = 50, callback=None, interval: float = 0.5, speed: int = 1, goback: bool = True) -> list:
+        """Scroll up in the message list and collect up to *n* historical messages.
+
+        Parameters
+        ----------
+        n : int
+            Maximum number of historical messages to collect (default 50).
+        callback : callable or None
+            If provided, called after each scroll with the current message list.
+            Return ``True`` from the callback to stop scrolling early.
+        interval : float
+            Seconds to wait between scroll actions (default 0.5).
+        speed : int
+            Number of scroll-wheel notches per step (default 1).
+        goback : bool
+            If True (default), scroll back to the bottom after collecting.
+
+        Returns
+        -------
+        list
+            List of ``Message`` objects, ordered oldest-first.
+        """
+        if not self.msgbox.Exists(0):
+            return []
+
+        seen_ids = set()
+        collected = []
+        bottom_ids = set()  # ids of messages visible at the bottom (original position)
+
+        # Record current visible messages so we can detect what's "new" after scroll
+        for ctrl in self._iter_message_controls():
+            rid = ctrl.runtimeid
+            if rid not in seen_ids:
+                seen_ids.add(rid)
+            bottom_ids.add(rid)
+
+        max_scrolls = max(n * 2, 100)  # safety limit
+        stale_rounds = 0
+
+        for _ in range(max_scrolls):
+            if len(collected) >= n:
+                break
+
+            # Scroll up
+            try:
+                self.msgbox.WheelUp(waitTime=interval, count=speed)
+            except Exception:
+                break
+            time.sleep(interval)
+
+            # Read new messages after scroll
+            new_this_round = 0
+            for ctrl in self._iter_message_controls():
+                rid = ctrl.runtimeid
+                if rid not in seen_ids:
+                    seen_ids.add(rid)
+                    try:
+                        msg = parse_msg(ctrl, self)
+                        collected.insert(0, msg)  # insert at front (older messages)
+                        new_this_round += 1
+                    except Exception:
+                        pass
+
+            if new_this_round == 0:
+                stale_rounds += 1
+                if stale_rounds >= 3:
+                    break  # no new messages after 3 scrolls — top of history
+            else:
+                stale_rounds = 0
+
+            # Let the caller decide to stop
+            if callback and callback(collected):
+                break
+
+        # Trim to n
+        collected = collected[-n:]
+
+        # Scroll back to bottom
+        if goback:
+            try:
+                for _ in range(max_scrolls):
+                    self.msgbox.WheelDown(waitTime=0.1, count=speed)
+                    time.sleep(0.05)
+                    # Stop when we see the original bottom messages again
+                    current_ids = {ctrl.runtimeid for ctrl in self._iter_message_controls()}
+                    if current_ids & bottom_ids:
+                        break
+            except Exception:
+                pass
+
+        return collected
+
 
 class AtEle:
     def __init__(self, control):
