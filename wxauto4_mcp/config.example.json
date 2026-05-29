@@ -1,6 +1,0 @@
-{
-  "api_base_url": "http://127.0.0.1:8760",
-  "api_token": null,
-  "dry_run_default": true,
-  "confirm_send": true
-}

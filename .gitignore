@@ -84,6 +84,21 @@ tests/*.json
 # Keep generic public probe test
 !tests/probe_wechat_locator.py
 
+# Experimental / generated modules not ready for public release
+wxauto4/api/
+wxauto4_mcp/
+openclaw_skill/
+scripts/
+
+# Local / generated high-level tests
+tests/regression_all.py
+tests/safety_check.py
+tests/test_history_message_module08.py
+tests/test_rest_api_module12.py
+tests/test_mcp_tools_module13.py
+tests/test_openclaw_skill_module14.py
+tests/manual_checklist.md
+
 # Generated AI plans / prompts
 wxauto4/plan/
 plan/
