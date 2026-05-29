@@ -1,3 +1,4 @@
 *.ipynb
 wxauto_logs
 __pycache__
+wxauto4/plan/
