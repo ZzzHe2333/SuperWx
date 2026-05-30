@@ -332,7 +332,7 @@ class MomentList(BaseUISubWnd):
                 wxlog.debug(f'找到疑似朋友圈列表控件：{class_name}')
                 return ctrl
 
-            # 朋友圈列表一般会包含“评论”按钮
+            # 朋友圈列表一般会包含"评论"按钮
             children = []
             try:
                 children = ctrl.GetChildren()
@@ -389,11 +389,12 @@ class MomentList(BaseUISubWnd):
 class Moment:
     """朋友圈接口封装。"""
 
-    def __init__(self, wx_obj):
+    def __init__(self, wx_obj, _force: bool = False):
         self._wx = wx_obj
         self._api = wx_obj._api
         self.root = wx_obj._api
         self._list: Optional[MomentList] = None
+        self._force = _force
 
     # ------------------------------------------------------------------------------------------
     # 内部工具
@@ -471,6 +472,8 @@ class Moment:
         return menu
 
     def Like(self, item: MomentItem, cancel: bool = False) -> WxResponse:
+        if not self._force:
+            return WxResponse.failure('朋友圈功能暂时不可用，需要传 _force=True 才能执行')
         menu = self._invoke_action_menu(item)
         if not menu:
             return WxResponse.failure('未能打开朋友圈操作菜单')
@@ -480,6 +483,8 @@ class Moment:
             menu.close()
 
     def Comment(self, item: MomentItem, content: str, reply_to: Optional[str] = None) -> WxResponse:
+        if not self._force:
+            return WxResponse.failure('朋友圈功能暂时不可用，需要传 _force=True 才能执行')
         if reply_to:
             comment = item.find_comment(reply_to)
             if not comment:
@@ -506,12 +511,12 @@ class Moment:
 
 
     # ------------------------------------------------------------------------------------------
-    # 新版朋友圈：点赞（SNSWindow 内嵌“赞/评论”浮层）
+    # 新版朋友圈：点赞（SNSWindow 内嵌"赞/评论"浮层）
     #
     # 适配你这版微信的 UIA 结构：
     # - 朋友圈是独立窗口：class='mmui::SNSWindow' aid='SNSWindow'
-    # - 每条动态底部有一条“很浅的灰线”（UIA 中表现为 ListItemControl: mmui::TimelineCommentCell，高度 1~3px）
-    # - 点灰线附近的“...”热点后，会在 SNSWindow 内出现 ButtonControl(name='赞') / ButtonControl(name='评论')
+    # - 每条动态底部有一条"很浅的灰线"（UIA 中表现为 ListItemControl: mmui::TimelineCommentCell，高度 1~3px）
+    # - 点灰线附近的"..."热点后，会在 SNSWindow 内出现 ButtonControl(name='赞') / ButtonControl(name='评论')
     #
     # 注意：Qt/mmui 的 ButtonControl.Click() 有时不会触发，因此这里默认走 Win32 真实鼠标点击。
     # ------------------------------------------------------------------------------------------
@@ -553,7 +558,7 @@ class Moment:
         return out
 
     def _click_more_hotspot(self, sep_row, x_ratio: float = 0.92, y_offset_up: int = 16):
-        """点击“...”热点（靠右，略高于灰线）。返回 (x,y)"""
+        """点击"..."热点（靠右，略高于灰线）。返回 (x,y)"""
         _, l, t, r, _, _ = sep_row
         x = int(l + (r - l) * x_ratio)
         y = int(t - y_offset_up)
@@ -607,7 +612,7 @@ class Moment:
         return True
 
     def _verify_after_like(self, sns: uia.Control, click_x: int, click_y: int, radius: int = 340, timeout: float = 1.0) -> bool:
-        """点完赞后验证：附近出现“取消”（已赞）或“赞”消失。"""
+        """点完赞后验证：附近出现"取消"（已赞）或"赞"消失。"""
         end = time.time() + timeout
         while time.time() < end:
             ctrls = self._find_like_panel_controls_near(sns, click_x, click_y, radius=radius)
@@ -622,38 +627,44 @@ class Moment:
     def LikeLatest(self, n: int = 1, cancel: bool = False, max_pages: int = 10) -> WxResponse:
         """给最新 n 条朋友圈点赞（或取消赞）。
 
-        说明：此方法适配你这版“SNSWindow 内嵌赞/评论浮层”。
+        说明：此方法适配你这版"SNSWindow 内嵌赞/评论浮层"。
+        注意：朋友圈功能当前不稳定，需要传 _force=True 才能执行。
 
         Args:
             n: 目标条数。
-            cancel: True 则点“取消”，用于取消已赞。
+            cancel: True 则点"取消"，用于取消已赞。
             max_pages: 最多翻页次数（滚动加载）。
 
         Returns:
             WxResponse
         """
+        if not self._force:
+            return WxResponse.failure('朋友圈功能暂时不可用，需要传 _force=True 才能执行')
 
-        try:
-            self._wx.SwitchToMoments()
-            time.sleep(0.2)
-        except Exception:
-            pass
-
-        sns = self._find_sns_window(timeout=6.0)
+        # 如果 SNSWindow 已存在则直接使用，否则尝试切换到朋友圈
+        sns = self._find_sns_window(timeout=2.0)
+        if not sns:
+            try:
+                self._wx.SwitchToMoments()
+                time.sleep(1)
+            except Exception:
+                pass
+            sns = self._find_sns_window(timeout=6.0)
         if not sns:
             return WxResponse.failure('未找到朋友圈窗口（SNSWindow）')
 
         # 等待朋友圈内容加载
         time.sleep(1.5)
 
-        # 滚动加载动态控件
+        # 点击 SNSWindow 获取焦点，然后滚动加载动态控件
         try:
             rect = _rect_of(sns)
             if _rect_ok(rect):
                 l, t, r, b = rect
                 cx, cy = (l + r) // 2, (t + b) // 2
-                win32.set_cursor_pos(cx, cy)
-                time.sleep(0.1)
+                # 先点击窗口获取焦点
+                win32.Click(uia.Rect(cx, cy, cx + 1, cy + 1))
+                time.sleep(0.3)
                 import win32api, win32con
                 for _ in range(6):
                     win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)
@@ -668,8 +679,14 @@ class Moment:
         for _page in range(max_pages):
             seps = self._find_comment_separators(sns)
             if not seps:
-                # 继续滚动加载
+                # 继续滚动加载 — 先把光标移回 SNSWindow 中心
                 try:
+                    rect = _rect_of(sns)
+                    if _rect_ok(rect):
+                        l, t, r, b = rect
+                        cx, cy = (l + r) // 2, (t + b) // 2
+                        win32.set_cursor_pos(cx, cy)
+                        time.sleep(0.1)
                     import win32api, win32con
                     for _ in range(3):
                         win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)

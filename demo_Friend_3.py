@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Demo: 给最新 N 条朋友圈点赞（接入 wxauto4 API）。
 
+朋友圈功能当前不稳定，默认不可用。
+需要传 _force=True 才能执行。
+
 Run:
     cd e:\\github\\SuperWx
     python demo_Friend_3.py
@@ -17,7 +20,7 @@ from wxauto4 import WeChat
 from wxauto4.moment import Moment
 
 
-def like_first_n_posts(n: int = 3):
+def like_first_n_posts(n: int = 3, force: bool = False):
     wx = WeChat()
 
     # 激活微信窗口
@@ -32,13 +35,18 @@ def like_first_n_posts(n: int = 3):
     wx.SwitchToMoments()
     time.sleep(2)
 
-    # 点赞
-    moment = Moment(wx)
+    # 点赞（需要 _force=True）
+    moment = Moment(wx, _force=force)
     print(f"[2] 点赞最新 {n} 条...")
     result = moment.LikeLatest(n=n, max_pages=10)
-
     print(f"    {result['message']}")
 
 
 if __name__ == "__main__":
-    like_first_n_posts(n=3)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true', help='强制执行朋友圈操作')
+    parser.add_argument('-n', type=int, default=3, help='点赞条数')
+    args = parser.parse_args()
+
+    like_first_n_posts(n=args.n, force=args.force)
