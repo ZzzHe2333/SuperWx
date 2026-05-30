@@ -16,6 +16,7 @@ from typing import (
     Tuple
 )
 from hashlib import md5
+import time
 
 if TYPE_CHECKING:
     from wxauto4.ui.chatbox import ChatBox
@@ -213,16 +214,99 @@ class HumanMessage(BaseMessage, ABC):
     def right_click(self):
         self._click(right=True, x=self._bias, y=WxParam.DEFAULT_MESSAGE_YBIAS)
 
+    def _find_body_controls(self):
+        """查找消息内部的文本/气泡子控件"""
+        rect = self.control.BoundingRectangle
+        candidates = []
+        for child, _ in uia.WalkControl(self.control, maxDepth=5):
+            ctype = child.ControlTypeName
+            cname = child.ClassName or ''
+            if ctype in ('TextControl', 'DocumentControl'):
+                try:
+                    cr = child.BoundingRectangle
+                    if cr.width() > 10 and cr.height() > 10:
+                        candidates.append(child)
+                except:
+                    pass
+            elif 'ChatText' in cname or 'Bubble' in cname or 'AlbumContent' in cname:
+                try:
+                    cr = child.BoundingRectangle
+                    if cr.width() > 10 and cr.height() > 10:
+                        candidates.append(child)
+                except:
+                    pass
+        return candidates
+
+    def right_click_message_body(self, max_retries=3):
+        """
+        右键点击消息主体区域（而非头像），确保菜单包含有意义的选项。
+        返回 (x_off, label, options) 或 None。
+        注意：调用方需自行管理菜单（不要用 ESC 关闭，会最小化窗口）。
+        """
+        if not self.exists():
+            return None
+
+        self.roll_into_view()
+        time.sleep(0.2)
+
+        rect = self.control.BoundingRectangle
+        rw, rh = rect.width(), rect.height()
+
+        # 生成候选 x 偏移（相对于控件左上角，ratioX=0）
+        # 基于实测：friend message x=51 点到头像，x=100 点到消息体
+        offsets = []
+        if self.is_self:
+            # self message: 用 ratioX=1, x 为负偏移（从右边算）
+            offsets = [
+                (-int(rw * 0.35), 'self_35pct', 1),
+                (-int(rw * 0.25), 'self_25pct', 1),
+                (-120, 'self_120px', 1),
+            ]
+        else:
+            # friend message: 用 ratioX=0, x 为正偏移（从左边算）
+            # 头像区域约 50px，需要 > 60 才能避开
+            offsets = [
+                (max(100, int(rw * 0.15)), 'friend_15pct', 0),
+                (max(120, int(rw * 0.25)), 'friend_25pct', 0),
+                (max(150, int(rw * 0.35)), 'friend_35pct', 0),
+            ]
+
+        AVATAR_ONLY_OPTIONS = {'拍一拍'}
+
+        for x_off, label, ratio_x in offsets[:max_retries]:
+            self.control.RightClick(x=x_off, y=27, ratioX=ratio_x, ratioY=0)
+            time.sleep(0.4)
+
+            menu = Menu(self, timeout=2)
+            if not menu.exists(0):
+                continue
+
+            options = menu.option_names
+            if options and set(options) != AVATAR_ONLY_OPTIONS:
+                return (x_off, label, options)
+            # 只有"拍一拍"，点到了头像，按 ESC 关闭菜单再试
+            # 注意：ESC 可能最小化窗口，这里用点击空白区域代替
+            # 但由于控件可能已失效，这里直接返回失败让调用方处理
+            return None
+
+        return None
+
     @uilock
     def select_option(self, option: str, timeout=2) -> WxResponse:
         if not self.exists():
             return WxResponse.failure('消息对象已失效')
-        self._click(right=True, x=self._bias*2, y=WxParam.DEFAULT_MESSAGE_YBIAS)
-        if menu := Menu(self, timeout):
+        result = self.right_click_message_body()
+        if result is None:
+            return WxResponse.failure(
+                f'未找到"{option}"选项，可能点击位置仍在头像或该消息不支持该操作'
+            )
+        x_off, label, options = result
+        # right_click_message_body 已打开菜单，直接查找选项
+        menu = Menu(self, timeout=timeout)
+        if menu.exists(0):
             return menu.select(option)
-        else:
-            return WxResponse.failure('操作失败')
-    
+        return WxResponse.failure('菜单已消失，操作失败')
+
     @uilock
     def forward(
         self, 

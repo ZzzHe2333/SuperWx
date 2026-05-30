@@ -56,6 +56,7 @@ debug_license*
 wxauto_logs/
 logs/
 *.log
+@AutomationLog.txt
 
 # UI dump / repair artifacts
 ui_dumps/
@@ -75,6 +76,8 @@ tests/manual_*.py
 tests/test_sendmsg_*.py
 tests/test_sendfiles_*.py
 tests/test_chatwith_*.py
+tests/test_like_moments_*.py
+tests/*moments*.py
 tests/regression_*.py
 tests/tmp_*
 tests/*.log
