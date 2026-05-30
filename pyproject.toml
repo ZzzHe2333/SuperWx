@@ -17,7 +17,6 @@ dependencies = [
     "comtypes"
 ]
 
-
 [project.scripts]
 superwx4 = "superwx4.__main__:main"
 
