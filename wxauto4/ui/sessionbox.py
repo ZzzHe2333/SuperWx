@@ -6,6 +6,7 @@ from wxauto4.param import (
 )
 from wxauto4.languages import MENU_OPTIONS
 from wxauto4.ui.component import Menu
+from wxauto4.ui.driver import get_driver
 from wxauto4.utils.win32 import SetClipboardText
 from wxauto4.logger import wxlog
 import time
@@ -57,12 +58,13 @@ class SessionBox:
             return []
 
     def search(
-            self, 
+            self,
             keywords: str,
             force: bool = False,
             force_wait: Union[float, int] = 0.5
         ):
-        self.searchbox.RightClick()
+        driver = get_driver()
+        driver.right_click(self.searchbox, reason='search paste', allow_foreground=True)
         SetClipboardText(keywords)
         menu = Menu(self)
         menu.select('粘贴')
@@ -85,6 +87,8 @@ class SessionBox:
         force_wait: Union[float, int] = 0.5
     ):
         wxlog.debug(f"切换聊天窗口: {keywords}, {exact}, {force}, {force_wait}")
+        driver = get_driver()
+
         # Fast path 1: click session item directly by AutomationId (newer WeChat uses session_item_<chatname>)
         try:
             direct = (
@@ -92,7 +96,7 @@ class SessionBox:
                 or self.root.control.ListItemControl(AutomationId=f"session_item_{keywords}")
             )
             if direct and direct.Exists(0):
-                direct.Click()
+                driver.click(direct, reason=f'switch chat: {keywords}')
                 return keywords
         except Exception:
             pass
@@ -104,11 +108,11 @@ class SessionBox:
                     item_name = (item.Name or '').split('\n')[0].strip()
                     if exact:
                         if item_name == keywords:
-                            item.Click()
+                            driver.click(item, reason=f'switch chat: {keywords}')
                             return keywords
                     else:
                         if keywords in item_name:
-                            item.Click()
+                            driver.click(item, reason=f'switch chat: {item_name}')
                             return item_name
         except Exception:
             pass
@@ -123,25 +127,25 @@ class SessionBox:
                 text: str = search_result_item.Name
                 if exact:
                     if text == keywords:
-                        search_result_item.Click()
+                        driver.click(search_result_item, reason=f'search result: {keywords}')
                         return keywords
                     elif (
                         ' 微信号: ' in text
                         and (split:=text.split(' 微信号: '))[-1].lower() == keywords.lower()
                     ):
-                        search_result_item.Click()
+                        driver.click(search_result_item, reason=f'search result: {split[0]}')
                         return split[0]
                     elif (
                         ' 昵称: ' in text
                         and (split:=text.split(' 昵称: '))[-1].lower() == keywords.lower()
                     ):
-                        search_result_item.Click()
+                        driver.click(search_result_item, reason=f'search result: {split[0]}')
                         return split[0]
                 else:
                     if keywords in text:
-                        search_result_item.Click()
+                        driver.click(search_result_item, reason=f'search result: {text}')
                         return text
-                    
+
         if self.search_content.Exists(0):
             self.control.MiddleClick()
 
