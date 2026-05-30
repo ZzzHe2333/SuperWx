@@ -1,0 +1,97 @@
+{
+  "name": "superwx4",
+  "version": "2.0.0",
+  "description": "WeChat 4.x automation skill via superwx4 — direct integration, no REST proxy",
+  "author": "SuperWx",
+  "capabilities": [
+    "initialize",
+    "status",
+    "is_online",
+    "get_my_info",
+    "get_sessions",
+    "get_recent_groups",
+    "switch_chat",
+    "send_message",
+    "send_files",
+    "send_audio",
+    "send_url_card",
+    "get_messages",
+    "get_new_messages",
+    "get_last_message",
+    "get_history_message",
+    "get_friend_list",
+    "get_friend_details",
+    "get_new_friends",
+    "add_new_friend",
+    "create_group",
+    "add_listen",
+    "remove_listen",
+    "start_listening",
+    "stop_listening",
+    "switch_to_chat",
+    "switch_to_contact",
+    "switch_to_moments",
+    "doctor",
+    "get_dialog"
+  ],
+  "config": {
+    "dry_run_default": true
+  },
+  "examples": [
+    {
+      "intent": "发微信给某人",
+      "utterances": [
+        "发微信给文件传输助手说你好",
+        "给张三发一条消息说明天见",
+        "在微信上告诉李四收到"
+      ]
+    },
+    {
+      "intent": "查看消息",
+      "utterances": [
+        "查看当前聊天最近10条消息",
+        "微信有什么新消息",
+        "看看微信会话列表"
+      ]
+    },
+    {
+      "intent": "发送文件",
+      "utterances": [
+        "把桌面上的报告发给文件传输助手",
+        "发送文件到某个群"
+      ]
+    },
+    {
+      "intent": "好友管理",
+      "utterances": [
+        "看看好友列表",
+        "有没有新好友请求",
+        "加一个叫张三的好友"
+      ]
+    },
+    {
+      "intent": "监听消息",
+      "utterances": [
+        "监听某个群的新消息",
+        "开始监听微信",
+        "停止监听微信"
+      ]
+    },
+    {
+      "intent": "切换页面",
+      "utterances": [
+        "切换到通讯录",
+        "打开朋友圈",
+        "回到聊天页面"
+      ]
+    },
+    {
+      "intent": "检查状态",
+      "utterances": [
+        "检查微信自动化状态",
+        "微信doctor",
+        "微信在线吗"
+      ]
+    }
+  ]
+}
