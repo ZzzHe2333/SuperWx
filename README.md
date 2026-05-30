@@ -9,6 +9,7 @@
 
 SuperWx 是一个适用于微信 4.1.8+ 客户端的 Python 自动化库，兼容官方 wxauto/wxautox4 API，提供消息发送、文件传输、消息监听等功能。
 
+
 ## 重要声明
 
 <font color='red'>**目前需要自行适配**</font>
