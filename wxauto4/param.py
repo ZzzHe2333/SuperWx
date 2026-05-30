@@ -38,6 +38,13 @@ class WxParam:
     # 发送文件超时时间，单位秒
     SEND_FILE_TIMEOUT: int = 10
 
+    # 后台优先操作模式
+    BACKGROUND_MODE: bool = True
+    ALLOW_FOREGROUND_FALLBACK: bool = False
+    FOREGROUND_LEASE_SECONDS: int = 3
+    RESTORE_MOUSE_POSITION: bool = True
+    RESTORE_FOREGROUND_WINDOW: bool = True
+
 class WxResponse(dict):
     def __init__(self, status: str, message: str, data: dict = None):
         super().__init__(status=status, message=message, data=data)
