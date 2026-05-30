@@ -665,15 +665,11 @@ class WeChat(Chat, Listener):
 
     def SwitchToChat(self) -> None:
         """切换到聊天页面"""
-        from wxauto4.ui.driver import get_driver
-        driver = get_driver()
-        driver.click(self._api._navigation_api.chat_icon, reason='switch to chat')
+        self._api._navigation_api.chat_icon.Click()
 
     def SwitchToContact(self) -> None:
         """切换到联系人页面"""
-        from wxauto4.ui.driver import get_driver
-        driver = get_driver()
-        driver.click(self._api._navigation_api.contact_icon, reason='switch to contact')
+        self._api._navigation_api.contact_icon.Click()
 
     def SwitchToFavorites(self) -> None:
         """切换到收藏页面"""

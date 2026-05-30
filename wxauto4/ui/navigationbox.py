@@ -1,7 +1,6 @@
 from wxauto4 import uia
-from wxauto4.ui.driver import get_driver
 from wxauto4.param import (
-    WxParam,
+    WxParam, 
     WxResponse,
 )
 
@@ -30,45 +29,35 @@ class NavigationBox:
         return text
 
     def switch_to_chat_page(self):
-        driver = get_driver()
-        driver.click(self.chat_icon, reason='nav: chat page')
+        self.chat_icon.Click()
 
     def switch_to_contact_page(self):
-        driver = get_driver()
-        driver.click(self.contact_icon, reason='nav: contact page')
+        self.contact_icon.Click()
 
     def switch_to_favorites_page(self):
-        driver = get_driver()
-        driver.click(self.favorites_icon, reason='nav: favorites page')
+        self.favorites_icon.Click()
 
     def switch_to_files_page(self):
-        driver = get_driver()
-        driver.click(self.files_icon, reason='nav: files page')
+        self.files_icon.Click()
 
     def switch_to_browser_page(self):
-        driver = get_driver()
-        driver.click(self.browser_icon, reason='nav: browser page')
+        self.browser_icon.Click()
 
     def switch_to_moments_page(self):
-        driver = get_driver()
-        driver.click(self.moments_icon, reason='nav: moments page')
+        self.moments_icon.Click()
 
     def switch_to_video_page(self):
-        driver = get_driver()
-        driver.click(self.video_icon, reason='nav: video page')
+        self.video_icon.Click()
 
     def switch_to_stories_page(self):
-        driver = get_driver()
-        driver.click(self.stories_icon, reason='nav: stories page')
+        self.stories_icon.Click()
 
     def switch_to_mini_program_page(self):
-        driver = get_driver()
-        driver.click(self.mini_program_icon, reason='nav: mini program page')
+        self.mini_program_icon.Click()
 
     def switch_to_phone_page(self):
-        driver = get_driver()
-        driver.click(self.phone_icon, reason='nav: phone page')
+        self.phone_icon.Click()
 
     def switch_to_settings_page(self):
-        driver = get_driver()
-        driver.click(self.settings_icon, reason='nav: settings page')
+        self.settings_icon.Click()
+
