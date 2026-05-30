@@ -3,6 +3,7 @@ from wxauto4.ui.component import (
     Menu,
     SelectContactWnd
 )
+from wxauto4.ui.driver import get_driver
 from wxauto4.utils import uilock
 from wxauto4.param import WxParam, WxResponse, PROJECT_NAME
 from abc import ABC, abstractmethod
@@ -90,6 +91,30 @@ class Message:
 
     def copy(self) -> Dict[str, Any]:
         return self.to_dict().copy()
+
+    # endregion ----------------------------------------------------------------
+
+    # region --- 信息访问 -------------------------------------------------------
+    @property
+    def info(self) -> Dict[str, Any]:
+        """消息基本信息（官方接口兼容）"""
+        return self.to_dict()
+
+    def chat_info(self) -> "WxResponse":
+        """获取消息所属会话信息
+
+        Returns:
+            WxResponse: data 包含 who, chat_type 字段
+
+        Note:
+            LOW 风险。只读。
+        """
+        parent = getattr(self, 'parent', None)
+        if parent is None:
+            return WxResponse.failure('无法获取会话信息：parent 不存在')
+        who = getattr(parent, 'who', None)
+        chat_type = getattr(parent, 'chat_type', None)
+        return WxResponse.success(data={'who': who, 'chat_type': chat_type})
 
     # endregion ----------------------------------------------------------------
 
@@ -209,7 +234,10 @@ class HumanMessage(BaseMessage, ABC):
     def _bias(self):...
 
     def click(self):
-        self._click(right=False, x=self._bias*2, y=WxParam.DEFAULT_MESSAGE_YBIAS)
+        driver = get_driver()
+        result = driver.click(self.control, reason='message click')
+        if not result.is_success:
+            self._click(right=False, x=self._bias*2, y=WxParam.DEFAULT_MESSAGE_YBIAS)
 
     def right_click(self):
         self._click(right=True, x=self._bias, y=WxParam.DEFAULT_MESSAGE_YBIAS)
@@ -273,8 +301,13 @@ class HumanMessage(BaseMessage, ABC):
 
         AVATAR_ONLY_OPTIONS = {'拍一拍'}
 
+        driver = get_driver()
         for x_off, label, ratio_x in offsets[:max_retries]:
-            self.control.RightClick(x=x_off, y=27, ratioX=ratio_x, ratioY=0)
+            driver.right_click(
+                self.control, x=x_off, y=27, ratioX=ratio_x, ratioY=0,
+                reason=f'message body right_click ({label})',
+                allow_foreground=True,
+            )
             time.sleep(0.4)
 
             menu = Menu(self, timeout=2)
@@ -332,10 +365,55 @@ class HumanMessage(BaseMessage, ABC):
         select_wnd = SelectContactWnd(self)
         return select_wnd.send(targets, interval=interval)
     
+    def tickle(self):
+        """拍一拍消息发送者
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。需要点击消息触发拍一拍。
+        """
+        return WxResponse.failure('not implemented: HumanMessage.tickle')
+
+    def download_head_image(self, dir_path=None):
+        """下载消息发送者头像
+
+        Args:
+            dir_path (str): 保存目录
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。可能需要点击头像触发加载。
+        """
+        return WxResponse.failure('not implemented: HumanMessage.download_head_image')
+
+    def edit_info(self, remark=None, tags=None, permission=None):
+        """编辑消息发送者信息
+
+        Args:
+            remark (str): 备注名
+            tags (str|list): 标签
+            permission (str): 朋友圈权限
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return WxResponse.failure(
+            'dry_run: HumanMessage.edit_info 不会真实执行。'
+            '需要显式 allow_foreground=True 以执行。',
+            data={'method': 'HumanMessage.edit_info', 'dry_run': True, 'risk': 'HIGH'},
+        )
+
     @uilock
     def quote(
-            self, text: str, 
-            at: Union[List[str], str] = None, 
+            self, text: str,
+            at: Union[List[str], str] = None,
             timeout: int = 3
         ) -> WxResponse:
         """引用消息

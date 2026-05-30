@@ -58,8 +58,62 @@ class SelfVoiceMessage(SelfMessage, VoiceMessage):
 
 class SelfOtherMessage(SelfMessage, OtherMessage):
     def __init__(
-            self, 
-            control: uia.Control, 
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfLocationMessage(SelfMessage, LocationMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfLinkMessage(SelfMessage, LinkMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfEmotionMessage(SelfMessage, EmotionMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfMergeMessage(SelfMessage, MergeMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfPersonalCardMessage(SelfMessage, PersonalCardMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class SelfNoteMessage(SelfMessage, NoteMessage):
+    def __init__(
+            self,
+            control: uia.Control,
             parent: "ChatBox",
             additonal_attr: Dict[str, Any]={}
         ):

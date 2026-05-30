@@ -58,8 +58,62 @@ class FriendVoiceMessage(FriendMessage, VoiceMessage):
 
 class FriendOtherMessage(FriendMessage, OtherMessage):
     def __init__(
-            self, 
-            control: uia.Control, 
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendLocationMessage(FriendMessage, LocationMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendLinkMessage(FriendMessage, LinkMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendEmotionMessage(FriendMessage, EmotionMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendMergeMessage(FriendMessage, MergeMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendPersonalCardMessage(FriendMessage, PersonalCardMessage):
+    def __init__(
+            self,
+            control: uia.Control,
+            parent: "ChatBox",
+            additonal_attr: Dict[str, Any]={}
+        ):
+        super().__init__(control, parent, additonal_attr)
+
+class FriendNoteMessage(FriendMessage, NoteMessage):
+    def __init__(
+            self,
+            control: uia.Control,
             parent: "ChatBox",
             additonal_attr: Dict[str, Any]={}
         ):
