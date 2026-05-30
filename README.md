@@ -1,26 +1,38 @@
-# SuperWx_IV - WeChat自动化工具
+# SuperWx - WeChat自动化工具
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-40.1.1-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/Platform-Windows10+-lightgrey.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/WeChat-4.0.5-green.svg" alt="WeChat">
+  <img src="https://img.shields.io/badge/WeChat-4.1.8+-green.svg" alt="WeChat">
 </p>
 
-SuperWx_IV 是一个适用于微信4.1.8.107客户端的 Python 自动化库，提供微信自动化操作接口，包括消息发送、文件传输等功能。
+SuperWx 是一个适用于微信 4.1.8+ 客户端的 Python 自动化库，兼容官方 wxauto/wxautox4 API，提供消息发送、文件传输、消息监听等功能。
 
 ## 重要声明
 
 <font color='red'>**目前需要自行适配**</font>
 
+## 特性
+
+- **API 兼容**：兼容官方 wxauto WeChat / Chat / Message 类接口
+- **后台优先**：默认后台操作，不抢鼠标、不抢前台焦点
+- **安全设计**：高风险方法默认 dry_run，需显式 allow_foreground 才执行
+- **消息监听**：支持多会话消息监听与回调
+
 ## 📁 项目结构
 
 ```text
 .
-├── wxauto4/          # 核心库代码
-├── examples/         # 示例脚本
-│   ├── demo.py
-│   └── one.py
+├── wxauto4/              # 核心库代码
+│   ├── wx.py             # WeChat / Chat 主类
+│   ├── msgs/             # Message 类型系统
+│   ├── ui/               # UI 自动化层
+│   │   └── driver.py     # 后台优先操作驱动
+│   ├── moment.py         # 朋友圈功能
+│   └── param.py          # 参数配置
+├── local_tests/          # 本地测试脚本（不提交）
+├── examples/             # 示例脚本
 ├── README.md
 └── pyproject.toml
 ```
@@ -47,6 +59,36 @@ for msg in messages:
 ```
 
 
+## API 兼容性
+
+本项目兼容官方 wxauto / wxautox4 文档中的主要接口：
+
+| 类 | 方法数 | 兼容率 |
+|---|---|---|
+| WeChat | 25+ | 100% |
+| Chat | 13 | 100% |
+| Message | 78+ (含类型类) | 100% |
+
+详见 [官方文档](https://docs.wxauto.org)
+
+## 安全设计
+
+高风险操作默认不执行，需显式授权：
+
+```python
+# 默认 dry_run，返回计划而非执行
+result = wx.AddNewFriend('张三')
+# → WxResponse.success({dry_run: True, method: 'WeChat.AddNewFriend', ...})
+
+# 显式允许前台操作
+result = wx.AddNewFriend('张三', allow_foreground=True)
+```
+
+**风险分级：**
+- **LOW**：只读操作（GetSession, IsOnline, GetMyInfo）
+- **MEDIUM**：可能切换页面（ChatWith, GetHistoryMessage）
+- **HIGH**：影响社交关系（AddNewFriend, CreateGroup, PublishMoment）
+
 ## 文档
 
 ### 1. 获取微信实例
@@ -56,6 +98,9 @@ from wxauto4 import WeChat
 
 # 创建微信主窗口实例
 wx = WeChat()
+
+# 带参数初始化
+wx = WeChat(nickname='微信', debug=True, resize=True)
 ```
 
 ### 2. 发送消息 - SendMsg
@@ -63,6 +108,12 @@ wx = WeChat()
 ```python
 # 基础消息发送
 wx.SendMsg('Hello!', '目标用户')
+
+# 后台发送（默认，不抢鼠标）
+wx.SendMsg('Hello!', '目标用户')
+
+# 允许前台发送（会激活窗口）
+wx.SendMsg('Hello!', '目标用户', allow_foreground=True)
 ```
 
 **参数说明：**
@@ -71,6 +122,7 @@ wx.SendMsg('Hello!', '目标用户')
 - `clear` (bool, optional): 发送后是否清空编辑框，默认 True
 - `at` (Union[str, List[str]], optional): @对象，支持字符串或列表
 - `exact` (bool, optional): 是否精确匹配用户名，默认 False
+- `allow_foreground` (bool, optional): 是否允许前台操作，默认 False
 
 ### 3. 发送文件 - SendFiles
 
@@ -190,6 +242,27 @@ try:
 finally:
     wx.StopListening()
 ```
+
+### 11. 消息类型
+
+消息对象支持多种类型，每种类型有对应的方法：
+
+| 类型 | 类 | 特有方法 |
+|---|---|---|
+| 文本 | TextMessage | — |
+| 图片 | ImageMessage | download(), ocr() |
+| 视频 | VideoMessage | download() |
+| 语音 | VoiceMessage | to_text() |
+| 文件 | FileMessage | download() |
+| 引用 | QuoteMessage | download_quote_image() |
+| 链接 | LinkMessage | get_url() |
+| 位置 | LocationMessage | — |
+| 表情 | EmotionMessage | — |
+| 合并转发 | MergeMessage | — |
+| 名片 | PersonalCardMessage | add_friend() |
+| 笔记 | NoteMessage | get_content(), save_files(), to_markdown() |
+
+每种类型都有 Friend/Self 变体（如 FriendTextMessage, SelfTextMessage）。
 
 ---
 

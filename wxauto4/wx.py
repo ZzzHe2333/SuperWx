@@ -489,12 +489,25 @@ class WeChat(Chat, Listener):
     """微信主窗口实例"""
 
     def __init__(
-            self, 
-            nickname: str=None, 
-            start_listener: bool=False,
-            debug: bool=False,
+            self,
+            nickname: str = None,
+            start_listener: bool = False,
+            debug: bool = False,
+            resize: bool = True,
+            version: str = "微信",
             **kwargs
         ):
+        """初始化 WeChat 实例
+
+        Args:
+            nickname (str, optional): 微信窗口昵称/标题
+            start_listener (bool): 是否启动消息监听
+            debug (bool): 是否开启调试模式
+            resize (bool): 是否调整窗口大小
+            version (str): 微信版本，"微信" 或 "WeChat"
+        """
+        if version not in ("微信", "WeChat"):
+            wxlog.debug(f'不支持的版本: {version}，仅支持 "微信" 和 "WeChat"')
         delete_update_files()
         hwnd = None
         if 'hwnd' in kwargs:
@@ -710,4 +723,327 @@ class WeChat(Chat, Listener):
     def ShutDown(self):
         delete_update_files()
         os.system(f'taskkill /f /pid {self._api.pid}')
+
+    # ===== WeChat-only methods (official API compatibility) =====
+
+    @uilock
+    def Moments(self, timeout: int = 3) -> WxResponse:
+        """获取朋友圈动态
+
+        Args:
+            timeout (int): 超时时间
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。会切换到朋友圈页面。
+        """
+        return WxResponse.failure('not implemented: WeChat.Moments')
+
+    @uilock
+    def PublishMoment(
+            self,
+            text: str = None,
+            media_files: list = None,
+            privacy_config: dict = None,
+        ) -> WxResponse:
+        """发布朋友圈
+
+        Args:
+            text (str, optional): 文字内容
+            media_files (list, optional): 媒体文件路径列表
+            privacy_config (dict, optional): 隐私配置
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return WxResponse.success(
+            data={
+                'dry_run': True,
+                'method': 'WeChat.PublishMoment',
+                'would_do': f'发布朋友圈: text={text!r}, media={media_files}',
+                'requires_foreground': True,
+                'risk': 'HIGH',
+            }
+        )
+
+    @uilock
+    def GetNewFriends(
+            self,
+            acceptable: bool = True,
+            roll_times: int = 0,
+        ) -> WxResponse:
+        """获取新好友请求
+
+        Args:
+            acceptable (bool): 是否只获取可接受的请求
+            roll_times (int): 滚动次数
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。会切换到新好友页面。
+        """
+        return WxResponse.failure('not implemented: WeChat.GetNewFriends')
+
+    @uilock
+    def AddNewFriend(
+            self,
+            keywords: str,
+            addmsg: str = None,
+            remark: str = None,
+            tags: Union[str, List[str]] = None,
+            permission: str = "朋友圈",
+            timeout: int = 5,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+        ) -> WxResponse:
+        """添加新好友
+
+        Args:
+            keywords (str): 搜索关键词
+            addmsg (str, optional): 验证消息
+            remark (str, optional): 备注名
+            tags (str|list, optional): 标签
+            permission (str): 朋友圈权限
+            timeout (int): 超时时间
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'WeChat.AddNewFriend',
+                    'would_do': f'添加好友: keywords={keywords!r}, remark={remark!r}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: WeChat.AddNewFriend')
+
+    @uilock
+    def EditFriendInfo(
+            self,
+            add_tags: Union[str, List[str]] = None,
+            remove_tags: Union[str, List[str]] = None,
+            remark: str = None,
+            tag_wait: float = 0.2,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+        ) -> WxResponse:
+        """编辑好友信息
+
+        Args:
+            add_tags (str|list, optional): 添加标签
+            remove_tags (str|list, optional): 移除标签
+            remark (str, optional): 备注名
+            tag_wait (float): 标签操作等待时间
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'WeChat.EditFriendInfo',
+                    'would_do': f'编辑好友: add_tags={add_tags}, remove_tags={remove_tags}, remark={remark!r}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: WeChat.EditFriendInfo')
+
+    def GetNextNewMessage(
+            self,
+            filter_mute: bool = False,
+            callback: Callable = None,
+        ) -> List['Message']:
+        """获取下一条新消息
+
+        Args:
+            filter_mute (bool): 是否过滤免打扰消息
+            callback (Callable, optional): 回调函数
+
+        Returns:
+            List[Message]: 新消息列表
+
+        Note:
+            MEDIUM 风险。需要轮询消息。
+        """
+        return []
+
+    def GetAllRecentGroups(self) -> List[str]:
+        """获取所有最近的群聊
+
+        Returns:
+            List[str]: 群聊名称列表
+
+        Note:
+            LOW 风险。只读。
+        """
+        return []
+
+    @uilock
+    def SendUrlCard(
+            self,
+            url: str,
+            friends: Union[str, List[str]] = None,
+            message: str = None,
+            timeout: int = 10,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+        ) -> WxResponse:
+        """发送链接卡片
+
+        Args:
+            url (str): 链接地址
+            friends (str|list, optional): 发送对象
+            message (str, optional): 附加消息
+            timeout (int): 超时时间
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'WeChat.SendUrlCard',
+                    'would_do': f'发送链接卡片: url={url!r}, friends={friends}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: WeChat.SendUrlCard')
+
+    @uilock
+    def GetFriendDetails(
+            self,
+            n: int = None,
+            timeout: int = 0xFFFFF,
+            save_head_image: bool = False,
+            save_head_wait: float = 0,
+            interval: float = 0,
+            callback: Callable = None,
+            speed: int = 3,
+            max_repeat: int = 10,
+        ) -> WxResponse:
+        """获取好友详情
+
+        Args:
+            n (int, optional): 获取数量
+            timeout (int): 超时时间
+            save_head_image (bool): 是否保存头像
+            save_head_wait (float): 保存头像等待时间
+            interval (float): 间隔时间
+            callback (Callable, optional): 回调函数
+            speed (int): 滚动速度
+            max_repeat (int): 最大重复次数
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。会切换到联系人页面。
+        """
+        return WxResponse.failure('not implemented: WeChat.GetFriendDetails')
+
+    @uilock
+    def CreateGroup(
+            self,
+            contacts: Union[str, List[str]],
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """创建群聊
+
+        Args:
+            contacts (str|list): 群成员
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'WeChat.CreateGroup',
+                    'would_do': f'创建群聊: members={contacts}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: WeChat.CreateGroup')
+
+    def IsOnline(self) -> bool:
+        """检查是否在线
+
+        Returns:
+            bool: 是否在线
+
+        Note:
+            LOW 风险。只读。
+        """
+        try:
+            return self._api.is_online()
+        except Exception:
+            return False
+
+    def GetMyInfo(self) -> dict:
+        """获取自己的信息
+
+        Returns:
+            dict: 个人信息
+
+        Note:
+            LOW 风险。只读。
+        """
+        try:
+            return self._api.get_my_info()
+        except Exception:
+            return {}
+
+    def GetDialog(self, wait: int = 3) -> WxResponse:
+        """获取当前对话框信息
+
+        Args:
+            wait (int): 等待时间
+
+        Returns:
+            WxResponse
+
+        Note:
+            LOW 风险。只读。
+        """
+        return WxResponse.failure('not implemented: WeChat.GetDialog')
 
