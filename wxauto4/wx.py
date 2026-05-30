@@ -158,7 +158,7 @@ class Chat:
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_msg(msg, who, clear, at, exact, allow_foreground=allow_foreground)
+        return self._api.send_msg(msg, who, clear, at, exact)
     
     @uilock
     def SendFiles(
@@ -179,7 +179,7 @@ class Chat:
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_files(filepath, who, exact, allow_foreground=allow_foreground)
+        return self._api.send_files(filepath, who, exact)
     
     def GetAllMessage(self) -> List['Message']:
         """获取当前聊天窗口的所有消息
