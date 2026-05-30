@@ -193,7 +193,7 @@ class WeChatMainWnd(WeChatSubWnd):
         self.control = uia.ControlFromHandle(hwnd)
         if self.control is not None:
             navigation_control = self.control.\
-                ToolBarControl(ClassName="mmui::MainTabBar", AutomationId='main_tabbar')
+                ToolBarControl(ClassName="mmui::MainTabBar", AutomationId='MainView.main_tabbar')
             sessionbox_control = self.control.\
                 GroupControl(ClassName="mmui::ChatMasterView")
             chatbox_control = self.control.\

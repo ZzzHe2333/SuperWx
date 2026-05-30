@@ -10,6 +10,7 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 
 from wxauto4 import uia
 from wxauto4.param import WxResponse
+from wxauto4.utils.win32 import Click as Win32Click, set_cursor_pos
 
 if TYPE_CHECKING:
     from wxauto4.ui.main import WeChatMainWnd
@@ -37,7 +38,12 @@ class ContactBox:
         try:
             btn = self.control.ButtonControl(Name='通讯录')
             if btn.Exists(0):
-                btn.Click()
+                rect = btn.BoundingRectangle
+                cx = int((rect.left + rect.right) / 2)
+                cy = int((rect.top + rect.bottom) / 2)
+                set_cursor_pos(cx, cy)
+                time.sleep(0.1)
+                Win32Click(uia.Rect(cx, cy, cx + 1, cy + 1))
                 time.sleep(1.5)
                 return True
         except Exception:

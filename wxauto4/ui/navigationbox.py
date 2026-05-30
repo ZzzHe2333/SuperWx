@@ -1,8 +1,10 @@
 from wxauto4 import uia
 from wxauto4.param import (
-    WxParam, 
+    WxParam,
     WxResponse,
 )
+from wxauto4.utils.win32 import Click, set_cursor_pos
+
 
 class NavigationBox:
     def __init__(self, control, parent):
@@ -28,36 +30,50 @@ class NavigationBox:
     def _lang(self, text):
         return text
 
+    def _win32_click(self, control):
+        """使用 Win32 鼠标事件点击控件（UIA Click 对 Qt/mmui 标签页无效）。"""
+        try:
+            rect = control.BoundingRectangle
+            cx = int((rect.left + rect.right) / 2)
+            cy = int((rect.top + rect.bottom) / 2)
+            set_cursor_pos(cx, cy)
+            import time
+            time.sleep(0.1)
+            Click(uia.Rect(cx, cy, cx + 1, cy + 1))
+        except Exception:
+            # fallback: try UIA Click
+            control.Click()
+
     def switch_to_chat_page(self):
-        self.chat_icon.Click()
+        self._win32_click(self.chat_icon)
 
     def switch_to_contact_page(self):
-        self.contact_icon.Click()
+        self._win32_click(self.contact_icon)
 
     def switch_to_favorites_page(self):
-        self.favorites_icon.Click()
+        self._win32_click(self.favorites_icon)
 
     def switch_to_files_page(self):
-        self.files_icon.Click()
+        self._win32_click(self.files_icon)
 
     def switch_to_browser_page(self):
-        self.browser_icon.Click()
+        self._win32_click(self.browser_icon)
 
     def switch_to_moments_page(self):
-        self.moments_icon.Click()
+        self._win32_click(self.moments_icon)
 
     def switch_to_video_page(self):
-        self.video_icon.Click()
+        self._win32_click(self.video_icon)
 
     def switch_to_stories_page(self):
-        self.stories_icon.Click()
+        self._win32_click(self.stories_icon)
 
     def switch_to_mini_program_page(self):
-        self.mini_program_icon.Click()
+        self._win32_click(self.mini_program_icon)
 
     def switch_to_phone_page(self):
-        self.phone_icon.Click()
+        self._win32_click(self.phone_icon)
 
     def switch_to_settings_page(self):
-        self.settings_icon.Click()
+        self._win32_click(self.settings_icon)
 
