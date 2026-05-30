@@ -449,7 +449,7 @@ class ChatBox(BaseUISubWnd):
 
             # Scroll up
             try:
-                self.msgbox.WheelUp(waitTime=interval, count=speed)
+                self.msgbox.WheelUp(waitTime=interval, wheelTimes=speed)
             except Exception:
                 break
             time.sleep(interval)
@@ -485,7 +485,7 @@ class ChatBox(BaseUISubWnd):
         if goback:
             try:
                 for _ in range(max_scrolls):
-                    self.msgbox.WheelDown(waitTime=0.1, count=speed)
+                    self.msgbox.WheelDown(waitTime=0.1, wheelTimes=speed)
                     time.sleep(0.05)
                     # Stop when we see the original bottom messages again
                     current_ids = {ctrl.runtimeid for ctrl in self._iter_message_controls()}
