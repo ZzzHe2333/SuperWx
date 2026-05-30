@@ -356,3 +356,4 @@ class NoteMessage(BaseMessage):
             LOW 风险。基于已解析内容生成。
         """
         return WxResponse.failure('not implemented: NoteMessage.to_markdown')
+# 1

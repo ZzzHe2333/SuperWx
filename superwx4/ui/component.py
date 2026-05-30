@@ -330,3 +330,4 @@ class WeChatImage(BaseUISubWnd):
             return WxResponse.failure('未找到图片窗口')
         except Exception as e:
             return WxResponse.failure(f'关闭失败: {e}')
+# 1

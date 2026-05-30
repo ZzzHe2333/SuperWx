@@ -35,3 +35,4 @@ def derive_for_dir(master_hex: str, src_dir: str, out_json="db_keys.json"):
     if out_json:
         Path(out_json).write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8")
     return mapping
+# 1

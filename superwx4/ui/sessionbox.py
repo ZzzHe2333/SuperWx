@@ -316,3 +316,4 @@ class SearchResultElement:
 
     def close(self):
         self.control.SendKeys('{Esc}')
+# 1

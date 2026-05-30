@@ -125,3 +125,4 @@ def _collect_interesting(node: Dict, out: List[str]):
         )
     for child in node.get("children", []):
         _collect_interesting(child, out)
+# 1

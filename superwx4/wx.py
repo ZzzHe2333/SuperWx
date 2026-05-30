@@ -1167,3 +1167,4 @@ class WeChat(Chat, Listener):
         """获取完整好友列表（GetFriendList 别名）"""
         return self.GetFriendList(**kwargs)
 
+# 1

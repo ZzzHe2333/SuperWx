@@ -273,3 +273,4 @@ class WeChatMainWnd(WeChatSubWnd):
         if result := self._session_api.open_separate_window(keywords):
             find_nickname = result['data'].get('nickname', keywords)
             return WeChatSubWnd(find_nickname, self)
+# 1

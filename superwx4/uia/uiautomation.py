@@ -8463,3 +8463,4 @@ if __name__ == '__main__':
 
     hello = '{Ctrl}{End}{Enter}Hello World! 你好世界！'
     SendKeys(hello)
+# 1

@@ -118,3 +118,4 @@ class FriendNoteMessage(FriendMessage, NoteMessage):
             additonal_attr: Dict[str, Any]={}
         ):
         super().__init__(control, parent, additonal_attr)
+# 1

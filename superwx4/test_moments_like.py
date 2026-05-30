@@ -345,3 +345,4 @@ def like_first_n_posts(n=3, cancel=False):
 if __name__ == "__main__":
     # 这里改你想点赞多少条
     like_first_n_posts(n=3, cancel=False)
+# 1

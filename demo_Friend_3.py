@@ -50,3 +50,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     like_first_n_posts(n=args.n, force=args.force)
+# 1

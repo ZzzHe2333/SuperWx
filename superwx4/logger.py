@@ -127,3 +127,4 @@ class WxautoLogger:
 
 # wxlog实例化的地方不再创建文件日志
 wxlog = WxautoLogger()
+# 1

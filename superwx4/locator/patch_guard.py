@@ -106,3 +106,4 @@ def guard_report(patch_path: str) -> str:
         for e in errors:
             lines.append(f"  - {e}")
     return "\n".join(lines)
+# 1

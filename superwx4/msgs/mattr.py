@@ -131,3 +131,4 @@ class SelfMessage(HumanMessage):
     @property
     def _bias(self):
         return -WxParam.DEFAULT_MESSAGE_XBIAS
+# 1

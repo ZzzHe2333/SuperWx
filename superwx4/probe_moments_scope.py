@@ -168,3 +168,4 @@ if __name__ == "__main__":
     print(f"\n✅ 选择 score 最高的窗口作为朋友圈 scope：score={best_score}")
     print(summary(best_win))
     print_hits(best_win, max_hits=120)
+# 1

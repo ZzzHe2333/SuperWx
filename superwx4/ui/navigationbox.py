@@ -77,3 +77,4 @@ class NavigationBox:
     def switch_to_settings_page(self):
         self._win32_click(self.settings_icon)
 
+# 1

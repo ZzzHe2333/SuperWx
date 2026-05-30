@@ -109,3 +109,4 @@ class WxResponse(dict):
     @classmethod
     def error(cls, message: str, data: dict = None):
         return cls(status="错误", message=message, data=data)
+# 1
