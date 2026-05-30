@@ -1,5 +1,9 @@
 # Python cache / test cache
 __pycache__/
+
+# Test directories
+test/
+tests/
 *.py[cod]
 *$py.class
 .pytest_cache/
