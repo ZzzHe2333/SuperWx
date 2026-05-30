@@ -643,22 +643,22 @@ class Moment:
         if not sns:
             return WxResponse.failure('未找到朋友圈窗口（SNSWindow）')
 
-        # 轻微滚动，确保动态控件生成
+        # 等待朋友圈内容加载
+        time.sleep(1.5)
+
+        # 滚动加载动态控件
         try:
             rect = _rect_of(sns)
             if _rect_ok(rect):
                 l, t, r, b = rect
                 cx, cy = (l + r) // 2, (t + b) // 2
                 win32.set_cursor_pos(cx, cy)
-                time.sleep(0.05)
-                # 复用 win32api 的滚轮（如果你环境没装 pywin32，会在 win32 模块里报错；wxauto4 本身依赖它）
-                try:
-                    import win32api, win32con
-                    for _ in range(2):
-                        win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)
-                        time.sleep(0.2)
-                except Exception:
-                    pass
+                time.sleep(0.1)
+                import win32api, win32con
+                for _ in range(6):
+                    win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)
+                    time.sleep(0.35)
+                time.sleep(0.5)
         except Exception:
             pass
 
@@ -671,10 +671,12 @@ class Moment:
                 # 继续滚动加载
                 try:
                     import win32api, win32con
-                    win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 6, 0)
+                    for _ in range(3):
+                        win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * 3, 0)
+                        time.sleep(0.3)
                 except Exception:
                     pass
-                time.sleep(0.6)
+                time.sleep(0.5)
                 continue
 
             for sep in seps:

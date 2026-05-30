@@ -20,12 +20,19 @@ from wxauto4.moment import Moment
 def like_first_n_posts(n: int = 3):
     wx = WeChat()
 
+    # 激活微信窗口
+    try:
+        wx._api.control.SetFocus()
+    except:
+        pass
+    time.sleep(0.3)
+
     # 切换到朋友圈
     print("[1] 切换到朋友圈...")
     wx.SwitchToMoments()
     time.sleep(2)
 
-    # 使用 Moment.LikeLatest() 点赞
+    # 点赞
     moment = Moment(wx)
     print(f"[2] 点赞最新 {n} 条...")
     result = moment.LikeLatest(n=n, max_pages=10)
