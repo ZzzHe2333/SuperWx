@@ -1,6 +1,6 @@
 from wxauto4 import uia
 from wxauto4.param import (
-    WxParam, 
+    WxParam,
     WxResponse,
 )
 from wxauto4.utils.win32 import (
@@ -11,6 +11,7 @@ from wxauto4.utils.win32 import (
 from wxauto4.ui.component import (
     Menu
 )
+from wxauto4.ui.driver import get_driver
 from wxauto4.logger import wxlog
 from .base import (
     BaseUISubWnd
@@ -147,13 +148,13 @@ class ChatBox(BaseUISubWnd):
 
     def clear_edit(self):
         self._show()
-        self.editbox.Click()
-        self.editbox.SendKeys('{Ctrl}a', waitTime=0)
-        self.editbox.SendKeys('{DELETE}')
+        driver = get_driver()
+        driver.set_text(self.editbox, '', reason='clear edit')
 
 
     def send_text(self, content: str):
         self._show()
+        driver = get_driver()
         t0 = time.time()
         while True:
             if time.time() - t0 > 10:
@@ -166,7 +167,10 @@ class ChatBox(BaseUISubWnd):
             self.editbox.SendKeys('{Ctrl}v')
             if self.editbox.GetValuePattern().Value.replace('￼', '').strip():
                 break
-            self.editbox.RightClick()
+            driver.right_click(
+                self.editbox, reason='paste fallback',
+                allow_foreground=True,
+            )
             menu = Menu(self)
             menu.select('粘贴')
             if self.editbox.GetValuePattern().Value.replace('￼', '').strip():
@@ -180,7 +184,13 @@ class ChatBox(BaseUISubWnd):
                 return WxResponse.failure(f'Timeout --> {self.who} - {content}')
             self._activate_editbox()
 
-            self.sendbtn.Click()
+            # Try InvokePattern first, fallback to real click
+            result = driver.invoke(self.sendbtn, reason='send button')
+            if not result.is_success:
+                driver.click(
+                    self.sendbtn, reason='send button',
+                    allow_foreground=True,
+                )
             time.sleep(0.3)
             if not self.editbox.GetValuePattern().Value:
                 return WxResponse.success(f"success")
@@ -214,8 +224,9 @@ class ChatBox(BaseUISubWnd):
         self.clear_edit()
 
         SetClipboardFiles(file_path)
-        self.editbox.Click()
-        self.editbox.SendKeys('{Ctrl}v')
+        driver = get_driver()
+        driver.click(self.editbox, reason='editbox for file paste', allow_foreground=True)
+        driver.send_keys(self.editbox, '{Ctrl}v', reason='paste file', allow_foreground=True)
         time.sleep(0.5)  # wait for file card to render
 
         # Re-locate send button after file is pasted
@@ -223,7 +234,9 @@ class ChatBox(BaseUISubWnd):
         if not ctrl_exists(self.sendbtn):
             return WxResponse.failure("粘贴文件后未找到发送按钮")
 
-        self.sendbtn.Click()
+        result = driver.invoke(self.sendbtn, reason='send file button')
+        if not result.is_success:
+            driver.click(self.sendbtn, reason='send file button', allow_foreground=True)
         time.sleep(0.3)
         return WxResponse.success()
 
