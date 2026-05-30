@@ -213,16 +213,37 @@ class WeChatImage(BaseUISubWnd):
         else:
             self.type = 'image'
 
-    def save(self, dir_path=None, timeout=10) -> Path:
+    def save(self, dir_path=None, timeout=10, *, dry_run=True, allow_foreground=False) -> Path:
         """保存图片/视频
 
         Args:
             dir_path (str): 保存文件夹路径
             timeout (int, optional): 保存超时时间，默认10秒
-        
+            dry_run (bool): 默认 True，只返回执行计划
+            allow_foreground (bool): 需要前台操作时必须为 True
+
         Returns:
             Path: 文件保存路径，即savepath
         """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'WeChatImage.save',
+                'dir_path': dir_path,
+                'timeout': timeout,
+                'requires_foreground': True,
+                'risk': 'MEDIUM',
+                'would_do': [
+                    'Locate image/video window',
+                    'Open save action',
+                    'Save media file',
+                ],
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: WeChatImage.save requires visible image window interaction'
+            )
         image_sufix = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'pic']
         if dir_path is None:
             dir_path = WxParam.DEFAULT_SAVE_PATH
@@ -280,3 +301,32 @@ class WeChatImage(BaseUISubWnd):
             wxlog.debug("关闭图片窗口")
             self.control.SendKeys('{Esc}')
         return filepath
+
+    def close(self, *, dry_run=True, allow_foreground=False):
+        """关闭图片/视频窗口
+
+        Args:
+            dry_run (bool): 默认 True，只返回执行计划
+            allow_foreground (bool): 需要前台操作时必须为 True
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'WeChatImage.close',
+                'requires_foreground': True,
+                'risk': 'MEDIUM',
+                'would_do': ['Close image/video window'],
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: WeChatImage.close requires visible image window interaction'
+            )
+
+        try:
+            if self.control and self.control.Exists(0):
+                self.control.SendKeys('{Esc}')
+                return WxResponse.success('图片窗口已关闭')
+            return WxResponse.failure('未找到图片窗口')
+        except Exception as e:
+            return WxResponse.failure(f'关闭失败: {e}')

@@ -38,6 +38,35 @@ class WxParam:
     # 发送文件超时时间，单位秒
     SEND_FILE_TIMEOUT: int = 10
 
+    # 聊天窗口大小
+    CHAT_WINDOW_SIZE: tuple = (800, 6000)
+
+    # 发送内容比例
+    SEND_CONTENT_RATIO: float = 0.9
+
+    # 获取下一条消息的最大数量和最大运行时间
+    GET_NEXT_MAX_QUANTITY: int = 30
+    GET_NEXT_MAX_RUNTIME: int = 10
+
+    # 特殊会话名称
+    SPECIAL_SESSION_NAME: list = ["公众号", "折叠的聊天", "QQ邮箱提醒", "服务号"]
+
+    # 回调停止标志
+    CALLBACK_STOP_SIGN: str = "stop"
+
+    # 输入@间隔时间
+    INPUT_AT_INTERVAL: float = 0.5
+
+    # 默认表情列表
+    DEFAULT_STICKERS: list = [
+        "[微笑]", "[撇嘴]", "[色]", "[发呆]", "[得意]", "[流泪]", "[害羞]", "[闭嘴]", "[睡]", "[大哭]",
+        "[尴尬]", "[发怒]", "[调皮]", "[呲牙]", "[惊讶]", "[难过]", "[囧]", "[抓狂]", "[吐]", "[偷笑]",
+        "[愉快]", "[白眼]", "[傲慢]", "[困]", "[惊恐]", "[憨笑]", "[悠闲]", "[咒骂]", "[疑问]", "[嘘]",
+        "[晕]", "[衰]", "[骷髅]", "[敲打]", "[再见]", "[擦汗]", "[抠鼻]", "[鼓掌]", "[坏笑]",
+        "[爱心]", "[拥抱]", "[强]", "[弱]", "[握手]", "[胜利]", "[OK]", "[合十]",
+        "[蛋糕]", "[玫瑰]", "[礼物]", "[红包]",
+    ]
+
     # 后台优先操作模式
     BACKGROUND_MODE: bool = True
     ALLOW_FOREGROUND_FALLBACK: bool = False
