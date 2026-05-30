@@ -79,9 +79,15 @@ class Chat:
         self._api = core
         self.who = self._api.nickname
 
+    @property
+    def chat_type(self) -> str:
+        """聊天类型（官方接口兼容）"""
+        info = self.ChatInfo()
+        return info.get('chat_type', 'unknown')
+
     def __repr__(self):
         return f'<{PROJECT_NAME} - {self.__class__.__name__} object("{self._api.nickname}")>'
-    
+
     def __str__(self):
         if hasattr(self, 'who'):
             return self.who
@@ -100,9 +106,25 @@ class Chat:
         else:
             return other + self.nickname
         
-    def Show(self):
-        """显示窗口"""
+    def Show(self, allow_foreground: bool = False):
+        """显示窗口
+
+        Args:
+            allow_foreground (bool): 是否允许前台操作，默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。会激活窗口。
+        """
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Show() 需要前台操作',
+                data={'method': 'Chat.Show', 'requires_foreground': True, 'risk': 'MEDIUM'},
+            )
         self._api._show()
+        return WxResponse.success()
 
     def ChatInfo(self) -> Dict[str, str]:
         """获取聊天窗口信息
@@ -115,12 +137,13 @@ class Chat:
     
     @uilock
     def SendMsg(
-            self, 
+            self,
             msg: str,
             who: str=None,
-            clear: bool=True, 
+            clear: bool=True,
             at: Union[str, List[str]]=None,
             exact: bool=False,
+            allow_foreground: bool=False,
         ) -> WxResponse:
         """发送消息
 
@@ -130,30 +153,33 @@ class Chat:
             clear (bool, optional): 发送后是否清空编辑框.
             at (Union[str, List[str]], optional): @对象，不指定则不@任何人
             exact (bool, optional): 搜索who好友时是否精确匹配，默认False，**当子窗口时，该参数无效**
+            allow_foreground (bool): 是否允许前台操作，默认 False
 
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_msg(msg, who, clear, at, exact)
+        return self._api.send_msg(msg, who, clear, at, exact, allow_foreground=allow_foreground)
     
     @uilock
     def SendFiles(
-            self, 
-            filepath, 
-            who=None, 
-            exact=False
+            self,
+            filepath,
+            who=None,
+            exact=False,
+            allow_foreground: bool=False,
         ) -> WxResponse:
         """向当前聊天窗口发送文件
-        
+
         Args:
-            filepath (str|list): 要复制文件的绝对路径  
+            filepath (str|list): 要复制文件的绝对路径
             who (str): 发送对象，不指定则发送给当前聊天对象，**当子窗口时，该参数无效**
             exact (bool, optional): 搜索who好友时是否精确匹配，默认False，**当子窗口时，该参数无效**
-            
+            allow_foreground (bool): 是否允许前台操作，默认 False
+
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_files(filepath, who, exact)
+        return self._api.send_files(filepath, who, exact, allow_foreground=allow_foreground)
     
     def GetAllMessage(self) -> List['Message']:
         """获取当前聊天窗口的所有消息
@@ -214,9 +240,250 @@ class Chat:
         """
         return self._api.get_history_msg(n, callback, interval, speed, goback)
 
-    def Close(self) -> None:
-        """关闭微信窗口"""
+    def Close(self, allow_foreground: bool = False) -> WxResponse:
+        """关闭聊天窗口
+
+        Args:
+            allow_foreground (bool): 是否允许前台操作，默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            MEDIUM 风险。会关闭窗口。
+        """
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Close() 需要前台操作',
+                data={'method': 'Chat.Close', 'requires_foreground': True, 'risk': 'MEDIUM'},
+            )
         self._api.close()
+        return WxResponse.success()
+
+    @uilock
+    def AtAll(
+            self,
+            msg: str = '',
+            who: Union[str, List[str]] = None,
+            exact: bool = False,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """@所有人
+
+        Args:
+            msg (str): 消息内容
+            who (str|list, optional): 指定@对象，None 表示@所有人
+            exact (bool): 是否精确匹配
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'Chat.AtAll',
+                    'would_do': f'@所有人: {msg!r}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: Chat.AtAll')
+
+    @uilock
+    def SendAudio(
+            self,
+            filepath: str,
+            duration: float = None,
+            start: float = 0,
+            who: str = None,
+            exact: bool = False,
+            max_retries: int = 3,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+        ) -> WxResponse:
+        """发送语音消息
+
+        Args:
+            filepath (str): 语音文件路径
+            duration (float, optional): 语音时长（秒）
+            start (float): 开始时间
+            who (str, optional): 发送对象
+            exact (bool): 是否精确匹配
+            max_retries (int): 最大重试次数
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'Chat.SendAudio',
+                    'would_do': f'发送语音: {filepath}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: Chat.SendAudio')
+
+    @uilock
+    def AddGroupMembers(
+            self,
+            members: Union[str, List[str]],
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """添加群成员
+
+        Args:
+            members (str|list): 要添加的成员
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'Chat.AddGroupMembers',
+                    'would_do': f'添加群成员: {members}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure('not implemented: Chat.AddGroupMembers')
+
+    def _group_setting_stub(self, method_name: str, value: str, dry_run: bool, allow_foreground: bool) -> WxResponse:
+        """群设置类方法通用 stub"""
+        if dry_run or not allow_foreground:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': f'Chat.{method_name}',
+                    'would_do': f'设置为: {value!r}',
+                    'requires_foreground': True,
+                    'risk': 'HIGH',
+                }
+            )
+        return WxResponse.failure(f'not implemented: Chat.{method_name}')
+
+    @uilock
+    def SetGroupName(
+            self,
+            value: str,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """设置群名称
+
+        Args:
+            value (str): 新群名称
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return self._group_setting_stub('SetGroupName', value, dry_run, allow_foreground)
+
+    @uilock
+    def SetGroupRemark(
+            self,
+            value: str,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """设置群备注
+
+        Args:
+            value (str): 新群备注
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return self._group_setting_stub('SetGroupRemark', value, dry_run, allow_foreground)
+
+    @uilock
+    def SetGroupAnnouncement(
+            self,
+            value: str,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """设置群公告
+
+        Args:
+            value (str): 新群公告
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return self._group_setting_stub('SetGroupAnnouncement', value, dry_run, allow_foreground)
+
+    @uilock
+    def SetGroupMyNickname(
+            self,
+            value: str,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            require_confirm: bool = True,
+        ) -> WxResponse:
+        """设置群内昵称
+
+        Args:
+            value (str): 新昵称
+            dry_run (bool): 默认 True，不真实执行
+            allow_foreground (bool): 默认 False
+            require_confirm (bool): 默认 True，需要确认
+
+        Returns:
+            WxResponse
+
+        Note:
+            HIGH 风险。默认 dry_run=True。
+        """
+        return self._group_setting_stub('SetGroupMyNickname', value, dry_run, allow_foreground)
+
 
 class WeChat(Chat, Listener):
     """微信主窗口实例"""
