@@ -60,6 +60,8 @@ debug_license*
 # Runtime logs
 wxauto_logs/
 logs/
+mcp/log/*
+!mcp/log/.gitkeep
 *.log
 @AutomationLog.txt
 
