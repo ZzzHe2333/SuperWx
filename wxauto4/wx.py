@@ -727,19 +727,46 @@ class WeChat(Chat, Listener):
     # ===== WeChat-only methods (official API compatibility) =====
 
     @uilock
-    def Moments(self, timeout: int = 3) -> WxResponse:
-        """获取朋友圈动态
+    def Moments(self, timeout: int = 3, *, dry_run: bool = True, allow_foreground: bool = False) -> WxResponse:
+        """获取朋友圈窗口对象
 
         Args:
             timeout (int): 超时时间
+            dry_run (bool): 默认 True，只返回执行计划
+            allow_foreground (bool): 需要前台操作时必须为 True
 
         Returns:
-            WxResponse
+            WxResponse: data 包含 MomentsWnd 实例
 
         Note:
             MEDIUM 风险。会切换到朋友圈页面。
+            默认 dry_run=True，不会真实执行。
         """
-        return WxResponse.failure('not implemented: WeChat.Moments')
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'WeChat.Moments',
+                'would_do': [
+                    'Switch to Moments page',
+                    'Locate SNSWindow',
+                    'Return MomentsWnd instance',
+                ],
+                'requires_foreground': True,
+                'risk': 'MEDIUM',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Moments requires switching to moments page'
+            )
+
+        from wxauto4.moment import Moment, MomentsWnd
+        try:
+            moment = Moment(self)
+            wnd = MomentsWnd(moment)
+            return WxResponse.success(data={'wnd': wnd})
+        except Exception as e:
+            return WxResponse.failure(f'打开朋友圈失败: {e}')
 
     @uilock
     def PublishMoment(

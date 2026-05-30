@@ -867,3 +867,319 @@ class MomentCommentDialog(BaseUISubWnd):
 
         return WxResponse.success('评论成功')
 
+
+# =============================================================================
+# Official API compatibility wrappers
+# =============================================================================
+
+class Moments:
+    """单条朋友圈内容对象（官方 API 兼容）。
+
+    包装 ``MomentItem``，提供与官方 ``Moments`` 类一致的接口：
+    ``content`` 属性、``Like()``、``Comment()`` 方法。
+    高风险操作默认 ``dry_run=True``。
+    """
+
+    def __init__(self, item: MomentItem):
+        self._item = item
+
+    @property
+    def content(self) -> str:
+        """朋友圈文本内容。"""
+        return self._item.content
+
+    @property
+    def author(self) -> str:
+        """发布者昵称。"""
+        return self._item.publisher
+
+    @property
+    def time(self) -> str:
+        """发布时间。"""
+        return self._item.timestamp
+
+    @property
+    def likes(self) -> List[str]:
+        """点赞用户列表。"""
+        return self._item.like_users
+
+    @property
+    def comments(self) -> List[MomentComment]:
+        """评论列表。"""
+        return self._item.comment_list
+
+    @property
+    def index(self) -> int:
+        """在列表中的索引。"""
+        return getattr(self._item, '_index', 0)
+
+    def Like(
+        self,
+        like: bool = True,
+        *,
+        dry_run: bool = True,
+        allow_foreground: bool = False,
+        require_confirm: bool = True,
+    ) -> WxResponse:
+        """点赞 / 取消点赞（HIGH 风险，默认 dry_run=True）。
+
+        Args:
+            like: True=点赞, False=取消点赞。
+            dry_run: 默认 True，只返回执行计划。
+            allow_foreground: 需要前台操作时必须为 True。
+            require_confirm: 需要用户确认。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'Moments.Like',
+                'like': like,
+                'content_preview': self.content[:100],
+                'requires_foreground': True,
+                'risk': 'HIGH',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Like requires visible UI interaction'
+            )
+
+        return WxResponse.failure(
+            'not implemented: Moments.Like real execution requires explicit confirmation'
+        )
+
+    def Comment(
+        self,
+        text: str,
+        *,
+        dry_run: bool = True,
+        allow_foreground: bool = False,
+        require_confirm: bool = True,
+    ) -> WxResponse:
+        """评论朋友圈（HIGH 风险，默认 dry_run=True）。
+
+        Args:
+            text: 评论内容。
+            dry_run: 默认 True，只返回执行计划。
+            allow_foreground: 需要前台操作时必须为 True。
+            require_confirm: 需要用户确认。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'Moments.Comment',
+                'text_preview': text[:100],
+                'content_preview': self.content[:100],
+                'requires_foreground': True,
+                'risk': 'HIGH',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Comment requires visible UI interaction'
+            )
+
+        return WxResponse.failure(
+            'not implemented: Moments.Comment real execution requires explicit confirmation'
+        )
+
+    def __repr__(self) -> str:
+        return f'<Moments author={self.author!r} content={self.content[:30]!r}>'
+
+
+class MomentsWnd:
+    """朋友圈窗口对象（官方 API 兼容）。
+
+    包装已有的 :class:`Moment` 接口，提供与官方 ``MomentsWnd`` 类一致的
+    方法签名：``GetMoments()``、``Refresh()``、``Close()``、``Publish()``。
+
+    高风险操作（Publish）默认 ``dry_run=True``。
+    """
+
+    def __init__(self, moment: Moment):
+        self._moment = moment
+        self._wx = moment._wx
+        self._api = moment._api
+
+    def GetMoments(
+        self,
+        next_page: bool = False,
+        speed1: int = 3,
+        speed2: int = 1,
+        *,
+        dry_run: bool = False,
+        allow_foreground: bool = False,
+        max_items: int = None,
+    ) -> WxResponse:
+        """获取朋友圈动态列表。
+
+        官方签名: GetMoments(next_page=False, speed1=3, speed2=1)
+
+        Args:
+            next_page: 是否获取下一页。
+            speed1: 滚动速度参数 1。
+            speed2: 滚动速度参数 2。
+            dry_run: 扩展参数，默认 False（只读操作）。
+            allow_foreground: 扩展参数，默认 False。
+            max_items: 最多返回条数。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'MomentsWnd.GetMoments',
+                'would_do': [
+                    'Ensure moments page is open',
+                    'Read visible moment items',
+                    'Scroll down for next page' if next_page else 'Read current page only',
+                ],
+                'requires_foreground': True,
+                'risk': 'LOW',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: GetMoments requires UI interaction to read moments'
+            )
+
+        # Real execution: read-only
+        try:
+            items = self._moment.GetMoments(refresh=True)
+        except Exception as e:
+            return WxResponse.failure(f'获取朋友圈失败: {e}')
+
+        if next_page:
+            # Scroll down to load more
+            try:
+                sns = self._moment._find_sns_window(timeout=3.0)
+                if sns:
+                    rect = _rect_of(sns)
+                    if _rect_ok(rect):
+                        l, t, r, b = rect
+                        cx, cy = (l + r) // 2, (t + b) // 2
+                        win32.set_cursor_pos(cx, cy)
+                        time.sleep(0.05)
+                        import win32api, win32con
+                        for _ in range(speed1):
+                            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120 * speed2, 0)
+                            time.sleep(0.3)
+                        time.sleep(0.5)
+                        items = self._moment.GetMoments(refresh=True)
+            except Exception:
+                pass
+
+        moments_list = [Moments(item) for item in items]
+        if max_items is not None:
+            moments_list = moments_list[:max_items]
+
+        return WxResponse.success(data={
+            'items': moments_list,
+            'total': len(moments_list),
+        })
+
+    def Refresh(self, *, dry_run: bool = False, allow_foreground: bool = False) -> WxResponse:
+        """刷新朋友圈。
+
+        Args:
+            dry_run: 扩展参数。
+            allow_foreground: 扩展参数。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'MomentsWnd.Refresh',
+                'would_do': ['Refresh moments list'],
+                'requires_foreground': True,
+                'risk': 'LOW',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Refresh requires UI interaction'
+            )
+
+        try:
+            self._moment._list = None  # Clear cache
+            return WxResponse.success('朋友圈已刷新')
+        except Exception as e:
+            return WxResponse.failure(f'刷新失败: {e}')
+
+    def Close(self, *, dry_run: bool = False, allow_foreground: bool = False) -> WxResponse:
+        """关闭朋友圈窗口。
+
+        Args:
+            dry_run: 扩展参数。
+            allow_foreground: 扩展参数。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'MomentsWnd.Close',
+                'would_do': ['Close moments window'],
+                'requires_foreground': True,
+                'risk': 'LOW',
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Close requires UI interaction'
+            )
+
+        try:
+            sns = self._moment._find_sns_window(timeout=2.0)
+            if sns:
+                sns.SendKeys('{Esc}')
+                return WxResponse.success('朋友圈窗口已关闭')
+            return WxResponse.failure('未找到朋友圈窗口')
+        except Exception as e:
+            return WxResponse.failure(f'关闭失败: {e}')
+
+    def Publish(
+        self,
+        text: str,
+        media_files: list = None,
+        privacy_config: dict = None,
+        *,
+        dry_run: bool = True,
+        allow_foreground: bool = False,
+        require_confirm: bool = True,
+    ) -> WxResponse:
+        """发布朋友圈（HIGH 风险，默认 dry_run=True）。
+
+        Args:
+            text: 文字内容。
+            media_files: 媒体文件路径列表。
+            privacy_config: 隐私配置。
+            dry_run: 默认 True，只返回执行计划。
+            allow_foreground: 需要前台操作时必须为 True。
+            require_confirm: 需要用户确认。
+        """
+        if dry_run:
+            return WxResponse.success(data={
+                'dry_run': True,
+                'method': 'MomentsWnd.Publish',
+                'text_preview': text[:100],
+                'media_files': media_files or [],
+                'privacy_config': privacy_config,
+                'requires_foreground': True,
+                'risk': 'HIGH',
+                'would_do': [
+                    'Open publish dialog',
+                    'Input text',
+                    'Attach media files',
+                    'Set privacy',
+                    'Publish moment',
+                ],
+            })
+
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: Publish requires visible UI interaction'
+            )
+
+        return WxResponse.failure(
+            'not implemented: Publish real execution requires explicit implementation review'
+        )
+
+    def __repr__(self) -> str:
+        return '<MomentsWnd>'
+
