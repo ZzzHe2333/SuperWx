@@ -158,7 +158,7 @@ class Chat:
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_msg(msg, who, clear, at, exact)
+        return self._api.send_msg(msg, who, clear, at, exact, allow_foreground=allow_foreground)
     
     @uilock
     def SendFiles(
@@ -179,7 +179,7 @@ class Chat:
         Returns:
             WxResponse: 是否发送成功
         """
-        return self._api.send_files(filepath, who, exact)
+        return self._api.send_files(filepath, who, exact, allow_foreground=allow_foreground)
     
     def GetAllMessage(self) -> List['Message']:
         """获取当前聊天窗口的所有消息
@@ -638,10 +638,12 @@ class WeChat(Chat, Listener):
     
     def StopListening(self, remove: bool = True) -> None:
         """停止监听
-        
+
         Args:
             remove (bool, optional): 是否移除监听对象. Defaults to True.
         """
+        if not hasattr(self, '_listener_thread') or self._listener_thread is None:
+            return
         while self._listener_thread.is_alive():
             self._listener_stop()
         if remove:
@@ -650,20 +652,24 @@ class WeChat(Chat, Listener):
                 self.RemoveListenChat(who)
 
     def StartListening(self) -> None:
+        if not hasattr(self, '_listener_thread') or self._listener_thread is None:
+            self._listener_start()
+            return
         if not self._listener_thread.is_alive():
             self._listener_start()
 
     @uilock
     def RemoveListenChat(
-            self, 
+            self,
             nickname: str,
-            close_window: bool = True
+            close_window: bool = False,
         ) -> WxResponse:
         """移除监听聊天
 
         Args:
             nickname (str): 要移除的监听聊天对象
-            close_window (bool, optional): 是否关闭聊天窗口. Defaults to True.
+            close_window (bool, optional): 是否关闭聊天窗口. Defaults to False
+                (closing requires foreground, so disabled by default).
 
         Returns:
             WxResponse: 执行结果
@@ -672,53 +678,53 @@ class WeChat(Chat, Listener):
             return WxResponse.failure('未找到监听对象')
         chat, _ = self.listen[nickname]
         if close_window:
-            chat.Close()
+            chat.Close(allow_foreground=True)
         del self.listen[nickname]
         return WxResponse.success()
 
-    def SwitchToChat(self) -> None:
+    def SwitchToChat(self, allow_foreground: bool = False) -> None:
         """切换到聊天页面"""
-        self._api._navigation_api.switch_to_chat_page()
+        return self._api._navigation_api.switch_to_chat_page(allow_foreground=allow_foreground)
 
-    def SwitchToContact(self) -> None:
+    def SwitchToContact(self, allow_foreground: bool = False) -> None:
         """切换到联系人页面"""
-        self._api._navigation_api.switch_to_contact_page()
+        return self._api._navigation_api.switch_to_contact_page(allow_foreground=allow_foreground)
 
-    def SwitchToFavorites(self) -> None:
+    def SwitchToFavorites(self, allow_foreground: bool = False) -> None:
         """切换到收藏页面"""
-        self._api._navigation_api.switch_to_favorites_page()
+        return self._api._navigation_api.switch_to_favorites_page(allow_foreground=allow_foreground)
 
-    def SwitchToFiles(self) -> None:
+    def SwitchToFiles(self, allow_foreground: bool = False) -> None:
         """切换到聊天文件页面"""
-        self._api._navigation_api.switch_to_files_page()
+        return self._api._navigation_api.switch_to_files_page(allow_foreground=allow_foreground)
 
-    def SwitchToMoments(self) -> None:
+    def SwitchToMoments(self, allow_foreground: bool = False) -> None:
         """切换到朋友圈页面"""
-        self._api._navigation_api.switch_to_moments_page()
+        return self._api._navigation_api.switch_to_moments_page(allow_foreground=allow_foreground)
 
-    def SwitchToBrowser(self) -> None:
+    def SwitchToBrowser(self, allow_foreground: bool = False) -> None:
         """切换到搜一搜页面"""
-        self._api._navigation_api.switch_to_browser_page()
+        return self._api._navigation_api.switch_to_browser_page(allow_foreground=allow_foreground)
 
-    def SwitchToVideo(self) -> None:
+    def SwitchToVideo(self, allow_foreground: bool = False) -> None:
         """切换到视频号页面"""
-        self._api._navigation_api.switch_to_video_page()
+        return self._api._navigation_api.switch_to_video_page(allow_foreground=allow_foreground)
 
-    def SwitchToStories(self) -> None:
+    def SwitchToStories(self, allow_foreground: bool = False) -> None:
         """切换到看一看页面"""
-        self._api._navigation_api.switch_to_stories_page()
+        return self._api._navigation_api.switch_to_stories_page(allow_foreground=allow_foreground)
 
-    def SwitchToMiniProgram(self) -> None:
+    def SwitchToMiniProgram(self, allow_foreground: bool = False) -> None:
         """切换到小程序面板页面"""
-        self._api._navigation_api.switch_to_mini_program_page()
+        return self._api._navigation_api.switch_to_mini_program_page(allow_foreground=allow_foreground)
 
-    def SwitchToPhone(self) -> None:
+    def SwitchToPhone(self, allow_foreground: bool = False) -> None:
         """切换到手机页面"""
-        self._api._navigation_api.switch_to_phone_page()
+        return self._api._navigation_api.switch_to_phone_page(allow_foreground=allow_foreground)
 
-    def SwitchToSettings(self) -> None:
+    def SwitchToSettings(self, allow_foreground: bool = False) -> None:
         """切换到更多设置页面"""
-        self._api._navigation_api.switch_to_settings_page()
+        return self._api._navigation_api.switch_to_settings_page(allow_foreground=allow_foreground)
 
     def ShutDown(self):
         delete_update_files()

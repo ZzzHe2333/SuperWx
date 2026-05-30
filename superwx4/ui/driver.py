@@ -146,6 +146,91 @@ class OperationDriver:
         control.SendKeys(keys)
         return WxResponse.success('SendKeys')
 
+    def clear_text(self, control, reason=""):
+        """Clear text in an edit control via Ctrl+A + Delete. No mouse needed."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        wxlog.debug(f'[driver] clear_text: {reason}')
+        control.SendKeys('{Ctrl}a', waitTime=0)
+        control.SendKeys('{DELETE}', waitTime=0.1)
+        return WxResponse.success('SendKeys clear')
+
+    def middle_click(self, control, reason="", allow_foreground=False):
+        """MiddleClick — always requires foreground (no UIA pattern equivalent)."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        if not (allow_foreground or self.mode == OperationMode.FOREGROUND or self._lease_active()):
+            wxlog.warning(f'[driver] foreground required for middle_click: {reason}')
+            return WxResponse.failure(f'foreground required: {reason}')
+        self._save_state()
+        try:
+            self._activate_wechat()
+            wxlog.warning(f'[driver] foreground middle_click: {reason}')
+            control.MiddleClick()
+            time.sleep(0.1)
+        finally:
+            self.restore_mouse()
+        return WxResponse.success('foreground middle_click')
+
+    def double_click(self, control, reason="", allow_foreground=False):
+        """DoubleClick — always requires foreground (no UIA pattern equivalent)."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        if not (allow_foreground or self.mode == OperationMode.FOREGROUND or self._lease_active()):
+            wxlog.warning(f'[driver] foreground required for double_click: {reason}')
+            return WxResponse.failure(f'foreground required: {reason}')
+        self._save_state()
+        try:
+            self._activate_wechat()
+            wxlog.warning(f'[driver] foreground double_click: {reason}')
+            control.DoubleClick()
+            time.sleep(0.1)
+        finally:
+            self.restore_mouse()
+        return WxResponse.success('foreground double_click')
+
+    def wheel_up(self, control, wheelTimes=1, reason=""):
+        """WheelUp on a control. No mouse movement needed."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        wxlog.debug(f'[driver] wheel_up({wheelTimes}): {reason}')
+        control.WheelUp(wheelTimes=wheelTimes)
+        return WxResponse.success('wheel_up')
+
+    def wheel_down(self, control, wheelTimes=1, reason=""):
+        """WheelDown on a control. No mouse movement needed."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        wxlog.debug(f'[driver] wheel_down({wheelTimes}): {reason}')
+        control.WheelDown(wheelTimes=wheelTimes)
+        return WxResponse.success('wheel_down')
+
+    def focus(self, control, reason=""):
+        """Try to give keyboard focus to a control. No mouse movement."""
+        if not control.Exists(0):
+            return WxResponse.failure(f'控件不存在: {reason}')
+        try:
+            control.SetFocus()
+            wxlog.debug(f'[driver] SetFocus: {reason}')
+            return WxResponse.success('SetFocus')
+        except Exception:
+            # Fallback: ValuePattern focus
+            wxlog.debug(f'[driver] SetFocus failed, trying click-area focus: {reason}')
+            return WxResponse.failure(f'focus failed: {reason}')
+
+    def activate_window(self, hwnd, reason="", allow_foreground=False):
+        """ShowWindow + SetForegroundWindow. Always requires foreground."""
+        if not (allow_foreground or self.mode == OperationMode.FOREGROUND or self._lease_active()):
+            wxlog.warning(f'[driver] foreground required for activate_window: {reason}')
+            return WxResponse.failure(f'foreground required: {reason}')
+        try:
+            win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+            win32gui.SetForegroundWindow(hwnd)
+            wxlog.warning(f'[driver] foreground activate_window: {reason}')
+            return WxResponse.success('activated')
+        except Exception as e:
+            return WxResponse.failure(f'activate_window failed: {e}')
+
     def invoke(self, control, reason="", dry_run=False):
         """
         InvokePattern.Invoke() — pure UIA, no mouse, no focus needed.

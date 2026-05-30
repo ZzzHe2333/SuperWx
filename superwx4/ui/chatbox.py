@@ -1,6 +1,6 @@
 from superwx4 import uia
 from superwx4.param import (
-    WxParam, 
+    WxParam,
     WxResponse,
 )
 from superwx4.utils.win32 import (
@@ -11,6 +11,7 @@ from superwx4.utils.win32 import (
 from superwx4.ui.component import (
     Menu
 )
+from superwx4.ui.driver import get_driver
 from superwx4.logger import wxlog
 from .base import (
     BaseUISubWnd
@@ -99,7 +100,8 @@ class ChatBox(BaseUISubWnd):
     
     def _activate_editbox(self):
         if not self.editbox.HasKeyboardFocus:
-            self.editbox.MiddleClick()
+            driver = get_driver()
+            driver.focus(self.editbox, reason='activate_editbox')
 
     def refresh_send_button(self):
         """Re-locate the send button (may only appear after text is entered)."""
@@ -146,18 +148,21 @@ class ChatBox(BaseUISubWnd):
                 self._empty = True
 
     def clear_edit(self):
-        self._show()
-        self.editbox.Click()
-        self.editbox.SendKeys('{Ctrl}a', waitTime=0)
-        self.editbox.SendKeys('{DELETE}')
+        driver = get_driver()
+        driver.clear_text(self.editbox, reason='clear_edit')
 
 
-    def send_text(self, content: str):
-        self._show()
+    def send_text(self, content: str, allow_foreground: bool = False):
+        driver = get_driver()
         t0 = time.time()
         while True:
             if time.time() - t0 > 10:
                 return WxResponse.failure(f'Timeout --> {self.who} - {content}')
+            # Try ValuePattern first
+            result = driver.set_text(self.editbox, content, reason='send_text input')
+            if result.is_success:
+                break
+            # Fallback: clipboard + SendKeys
             SetClipboardText(content)
             self._activate_editbox()
             self.editbox.SendKeys('{Ctrl}v')
@@ -166,9 +171,12 @@ class ChatBox(BaseUISubWnd):
             self.editbox.SendKeys('{Ctrl}v')
             if self.editbox.GetValuePattern().Value.replace('￼', '').strip():
                 break
-            self.editbox.RightClick()
-            menu = Menu(self)
-            menu.select('粘贴')
+            # Last resort: right-click paste (requires foreground)
+            if allow_foreground:
+                driver.right_click(self.editbox, reason='send_text paste fallback',
+                                   allow_foreground=True)
+                menu = Menu(self)
+                menu.select('粘贴')
             if self.editbox.GetValuePattern().Value.replace('￼', '').strip():
                 break
         time.sleep(0.2)
@@ -180,27 +188,30 @@ class ChatBox(BaseUISubWnd):
                 return WxResponse.failure(f'Timeout --> {self.who} - {content}')
             self._activate_editbox()
 
-            self.sendbtn.Click()
+            result = driver.click(self.sendbtn, reason='send button',
+                                  allow_foreground=allow_foreground)
+            if not result.is_success:
+                return result
             time.sleep(0.3)
             if not self.editbox.GetValuePattern().Value:
                 return WxResponse.success(f"success")
             elif not self.editbox.GetValuePattern().Value.replace('￼', '').strip():
-                return self.send_text(content)
+                return self.send_text(content, allow_foreground=allow_foreground)
 
-    def send_msg(self, content: str, clear: bool=True, at=None):
+    def send_msg(self, content: str, clear: bool=True, at=None, allow_foreground: bool = False):
         wxlog.debug(f"发送消息: {content}")
         if not content and not at:
             return WxResponse.failure(f"`content` and `at` can't be empty at the same time")
-        
+
         if clear:
             self.clear_edit()
         if at:
             self.input_at(at)
 
-        return self.send_text(content)
+        return self.send_text(content, allow_foreground=allow_foreground)
     
     # @uilock
-    def send_file(self, file_path):
+    def send_file(self, file_path, allow_foreground: bool = False):
         wxlog.debug(f"发送文件: {file_path}")
         if isinstance(file_path, str):
             file_path = [file_path]
@@ -213,9 +224,9 @@ class ChatBox(BaseUISubWnd):
 
         self.clear_edit()
 
+        driver = get_driver()
         SetClipboardFiles(file_path)
-        self.editbox.Click()
-        self.editbox.SendKeys('{Ctrl}v')
+        driver.send_keys(self.editbox, '{Ctrl}v', reason='send_file paste')
         time.sleep(0.5)  # wait for file card to render
 
         # Re-locate send button after file is pasted
@@ -223,7 +234,10 @@ class ChatBox(BaseUISubWnd):
         if not ctrl_exists(self.sendbtn):
             return WxResponse.failure("粘贴文件后未找到发送按钮")
 
-        self.sendbtn.Click()
+        result = driver.click(self.sendbtn, reason='send_file button',
+                              allow_foreground=allow_foreground)
+        if not result.is_success:
+            return result
         time.sleep(0.3)
         return WxResponse.success()
 
@@ -521,19 +535,20 @@ class AtMenu(BaseUISubWnd):
         for _ in range(len(friend)+1):
             self.root._chat_api.editbox.SendKeys('{BACK}')
 
-    def select(self, friend): 
+    def select(self, friend):
         friend_ = friend.replace(' ', '')
         if self.exists():
+            driver = get_driver()
             ateles = self.control.ListControl().GetChildren()
             if len(ateles) == 1:
-                ateles[0].Click()
+                driver.click(ateles[0], reason='@menu single item')
                 return WxResponse.success()
-            
+
             else:
                 atele = self.control.ListItemControl(Name=friend)
                 if atele.Exists(0):
                     uia.RollIntoView(self.control, atele)
-                    atele.Click()
+                    driver.click(atele, reason=f'@menu select {friend}')
                     return WxResponse.success()
                 else:
                     self.clear(friend_)

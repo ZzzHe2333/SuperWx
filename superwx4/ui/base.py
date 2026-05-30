@@ -1,5 +1,5 @@
 from superwx4 import uia
-from superwx4.param import PROJECT_NAME
+from superwx4.param import PROJECT_NAME, WxResponse
 from superwx4.logger import wxlog
 from superwx4.utils.lock import uilock
 from abc import ABC, abstractmethod
@@ -17,20 +17,32 @@ class BaseUIWnd(ABC):
 
     def __repr__(self):
         return f"<{PROJECT_NAME} - {self.__class__.__name__} at {hex(id(self))}>"
-    
+
     def __eq__(self, other):
         return self.control == other.control
-    
+
     def __bool__(self):
         return self.exists()
 
-    def _show(self):
+    def _show(self, allow_foreground=False):
+        """Show and activate the window.
+
+        Args:
+            allow_foreground: If False (default), does NOT activate the window.
+                Returns WxResponse.failure instead of stealing foreground.
+        """
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: _show() 需要前台操作',
+                data={'method': '_show', 'requires_foreground': True},
+            )
         if not hasattr(self, 'HWND'):
             self.HWND = self.control.GetTopLevelControl().NativeWindowHandle
         win32gui.ShowWindow(self.HWND, 1)
         win32gui.SetWindowPos(self.HWND, -1, 0, 0, 0, 0, 3)
         win32gui.SetWindowPos(self.HWND, -2, 0, 0, 0, 0, 3)
         self.control.Show()
+        return WxResponse.success()
 
     @property
     def pid(self):
@@ -38,9 +50,11 @@ class BaseUIWnd(ABC):
 
     @uilock
     def close(self):
+        from superwx4.ui.driver import get_driver
+        driver = get_driver()
         try:
             for i in range(2):
-                self.control.SendKeys('{Esc}')
+                driver.send_keys(self.control, '{Esc}', reason='close()')
         except:
             pass
 

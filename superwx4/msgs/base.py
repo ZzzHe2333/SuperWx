@@ -233,14 +233,20 @@ class HumanMessage(BaseMessage, ABC):
     @abstractmethod
     def _bias(self):...
 
-    def click(self):
+    def click(self, allow_foreground: bool = False):
         driver = get_driver()
-        result = driver.click(self.control, reason='message click')
-        if not result.is_success:
-            self._click(right=False, x=self._bias*2, y=WxParam.DEFAULT_MESSAGE_YBIAS)
+        result = driver.click(self.control, reason='message click',
+                              allow_foreground=allow_foreground)
+        return result
 
-    def right_click(self):
-        self._click(right=True, x=self._bias, y=WxParam.DEFAULT_MESSAGE_YBIAS)
+    def right_click(self, allow_foreground: bool = False):
+        driver = get_driver()
+        result = driver.right_click(
+            self.control, x=self._bias, y=WxParam.DEFAULT_MESSAGE_YBIAS,
+            reason='message right_click',
+            allow_foreground=allow_foreground,
+        )
+        return result
 
     def _find_body_controls(self):
         """查找消息内部的文本/气泡子控件"""

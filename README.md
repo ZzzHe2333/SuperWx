@@ -62,13 +62,13 @@ for msg in messages:
 
 ## API 兼容性
 
-本项目兼容官方 wxauto / wxautox4 文档中的主要接口：
+本项目覆盖官方 wxauto / wxautox4 文档中的主要接口名称：
 
-| 类 | 方法数 | 兼容率 |
+| 类 | 方法数 | 状态 |
 |---|---|---|
-| WeChat | 25+ | 100% |
-| Chat | 13 | 100% |
-| Message | 78+ (含类型类) | 100% |
+| WeChat | 25+ | 核心收发、读取、监听可用；部分高风险社交操作为 dry_run 或未实现 |
+| Chat | 13 | SendMsg、SendFiles、GetAllMessage 可用；AtAll 等默认 dry_run |
+| Message | 78+ (含类型类) | 类型解析完整；download/forward/quote 等需前台交互 |
 
 详见 [官方文档](https://docs.wxauto.org)
 

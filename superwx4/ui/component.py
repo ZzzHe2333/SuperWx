@@ -13,6 +13,7 @@ from superwx4.utils.tools import (
 )
 from .base import BaseUISubWnd
 from superwx4.param import WxParam, WxResponse
+from superwx4.ui.driver import get_driver
 from superwx4.logger import wxlog
 from pathlib import Path
 from typing import (
@@ -40,12 +41,13 @@ class UpdateWindow(BaseUISubWnd):
                 break
 
     def ignore(self):
+        driver = get_driver()
         ignore_btn = self.control.ButtonControl(
-            ClassName="mmui::XOutlineButton", 
+            ClassName="mmui::XOutlineButton",
             Name="忽略本次更新"
         )
         if ignore_btn.Exists(0):
-            ignore_btn.Click()
+            driver.click(ignore_btn, reason='ignore update')
 
 class Menu(BaseUISubWnd):
     _ui_cls_name:str="mmui::XMenu"
@@ -84,14 +86,17 @@ class Menu(BaseUISubWnd):
     def select(self, item):
         if not self.exists(0):
             return WxResponse.failure('菜单窗口不存在')
+        driver = get_driver()
         if isinstance(item, int):
-            self.option_controls[item].Click()
-            return WxResponse.success()
-        
+            result = driver.click(self.option_controls[item], reason=f'menu item #{item}')
+            if result.is_success:
+                return result
+            return result
+
         for c in self.option_controls:
             if c.Name == item:
-                c.Click()
-                return WxResponse.success()
+                result = driver.click(c, reason=f'menu item: {item}')
+                return result
         if self.exists(0):
             self.close()
         return WxResponse.failure(f'未找到选项：{item}')
@@ -124,12 +129,13 @@ class SelectContactWnd(BaseUISubWnd):
 
     def search(self, keyword, interval=0.1):
         """搜索并选择，需完全匹配"""
-        # SearchContactView = self.control.GroupControl(ClassName="mmui::SearchContactView")
+        driver = get_driver()
         search_control = self.control.EditControl(ClassName="mmui::XValidatorTextEdit")
         SetClipboardText(keyword)
-        search_control.Click()
-        search_control.SendKeys('{Ctrl}a')
-        search_control.RightClick()
+        driver.click(search_control, reason='contact search input')
+        driver.clear_text(search_control, reason='contact search clear')
+        driver.right_click(search_control, reason='contact search paste',
+                           allow_foreground=True)
         menu = Menu(self)
         menu.select('粘贴')
         time.sleep(interval)
@@ -141,12 +147,12 @@ class SelectContactWnd(BaseUISubWnd):
                 target.ControlTypeName == 'CheckBoxControl'
                 and target.Name == keyword
             ):
-                target.Click()
+                driver.click(target, reason=f'contact select: {keyword}')
                 return True
 
     def confirm(self):
-        # self.root.control.winapi.click_by_bbox(self.confirm_btn_bbox)
-        self.confirm_btn.Click()
+        driver = get_driver()
+        driver.click(self.confirm_btn, reason='contact confirm')
 
     def send(self, target, interval=0.1):
         if isinstance(target, str):
@@ -178,14 +184,16 @@ class SearchNewFriendWnd(BaseUISubWnd):
         self.search_btn = self.control.ButtonControl(ClassName="mmui::XOutlineButton", Name="搜索")
 
     def search(self, keyword):
-        self.search_edit.SendKeys('{Ctrl}a')
+        driver = get_driver()
+        driver.clear_text(self.search_edit, reason='new friend search clear')
         SetClipboardText(keyword)
-        self.search_edit.SendKeys('{Ctrl}v')
-        self.search_btn.Click()
+        driver.send_keys(self.search_edit, '{Ctrl}v', reason='new friend search paste')
+        driver.click(self.search_btn, reason='new friend search button')
 
     def apply(self):
+        driver = get_driver()
         if self.apply_btn.Exists(0):
-            self.apply_btn.Click()
+            driver.click(self.apply_btn, reason='new friend apply button')
             return WxResponse.success()
         else:
             return WxResponse.failure('未找到添加按钮')
@@ -259,7 +267,9 @@ class WeChatImage(BaseUISubWnd):
             if self.control.TextControl(Name="图片过期或已被清理").Exists(0):
                 return WxResponse.failure('图片过期或已被清理')
             try:
-                self.tools['更多'].Click()
+                driver = get_driver()
+                driver.click(self.tools['更多'], reason='image save more button',
+                             allow_foreground=True)
                 menu = Menu(self.root)
                 menu.select('复制')
                 if self.type == 'video':

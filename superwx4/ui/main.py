@@ -101,28 +101,30 @@ class WeChatSubWnd(BaseUISubWnd):
         return self._chat_api.get_info()
     
     def send_msg(
-            self, 
+            self,
             msg: str,
             who: str=None,
-            clear: bool=True, 
+            clear: bool=True,
             at: Union[str, List[str]]=None,
             exact: bool=False,
+            allow_foreground: bool = False,
         ) -> WxResponse:
         chatbox = self._get_chatbox(who, exact)
         if chatbox is None:
             return WxResponse.failure(f"未找到聊天窗口：{who}")
-        return chatbox.send_msg(msg, clear, at)
-    
+        return chatbox.send_msg(msg, clear, at, allow_foreground=allow_foreground)
+
     def send_files(
-            self, 
-            filepath, 
-            who=None, 
-            exact=False
+            self,
+            filepath,
+            who=None,
+            exact=False,
+            allow_foreground: bool = False,
         ) -> WxResponse:
         chatbox = self._get_chatbox(who, exact)
         if chatbox is None:
             return WxResponse.failure(f"未找到聊天窗口：{who}")
-        return chatbox.send_file(filepath)
+        return chatbox.send_file(filepath, allow_foreground=allow_foreground)
     
     def get_msgs(self):
         chatbox = self._get_chatbox()
