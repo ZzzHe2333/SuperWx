@@ -1,4 +1,4 @@
-from wxauto4 import WeChat
+from superwx4 import WeChat
 
 # 初始化微信实例
 wx = WeChat()

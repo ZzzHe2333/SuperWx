@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Demo: 给最新 N 条朋友圈点赞（接入 wxauto4 API）。
+"""Demo: 给最新 N 条朋友圈点赞（接入 superwx4 API）。
 
 朋友圈功能当前不稳定，默认不可用。
 需要传 _force=True 才能执行。
@@ -16,8 +16,8 @@ CUR = os.path.dirname(os.path.abspath(__file__))
 if CUR not in sys.path:
     sys.path.insert(0, CUR)
 
-from wxauto4 import WeChat
-from wxauto4.moment import Moment
+from superwx4 import WeChat
+from superwx4.moment import Moment
 
 
 def like_first_n_posts(n: int = 3, force: bool = False):

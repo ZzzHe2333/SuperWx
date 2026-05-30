@@ -48,7 +48,7 @@ ENV/
 *api_key*
 
 # wxauto / license / activation local files
-.wxauto4/
+.superwx4/
 .wxauto/
 license.json
 license_request.json
@@ -64,15 +64,15 @@ logs/
 
 # UI dump / repair artifacts
 ui_dumps/
-.wxauto4_repair/dumps/*
-.wxauto4_repair/reports/*
-.wxauto4_repair/patches/*
+.superwx4_repair/dumps/*
+.superwx4_repair/reports/*
+.superwx4_repair/patches/*
 
 # Keep repair directory structure only
-!.wxauto4_repair/.gitignore
-!.wxauto4_repair/dumps/.gitkeep
-!.wxauto4_repair/reports/.gitkeep
-!.wxauto4_repair/patches/.gitkeep
+!.superwx4_repair/.gitignore
+!.superwx4_repair/dumps/.gitkeep
+!.superwx4_repair/reports/.gitkeep
+!.superwx4_repair/patches/.gitkeep
 
 # Local/manual test scripts
 local_tests/
@@ -92,7 +92,7 @@ tests/*.json
 !tests/probe_wechat_locator.py
 
 # Experimental / generated modules not ready for public release
-wxauto4/api/
+superwx4/api/
 wxauto4_mcp/
 openclaw_skill/
 scripts/
@@ -107,7 +107,7 @@ tests/test_openclaw_skill_module14.py
 tests/manual_checklist.md
 
 # Generated AI plans / prompts
-wxauto4/plan/
+superwx4/plan/
 plan/
 plans/
 *_投喂总文件.txt

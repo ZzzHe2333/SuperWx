@@ -1,5 +1,5 @@
 [project]
-name = "wxauto4"
+name = "superwx4"
 version = "40.1.1"
 description = "wxauto for 4.0 client"
 authors = [
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-wxauto4 = "wxauto4.__main__:main"
+superwx4 = "superwx4.__main__:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
