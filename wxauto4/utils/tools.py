@@ -34,10 +34,13 @@ def find_all_windows_from_root(classname:str=None, name:str=None, pid:int=None, 
     windows = GetAllWindows()
     targets = []
     for window in windows:
-        if (
-            (all((classname, name)) and classname == window[1] and name == window[2])
-            or (all((classname, not name)) and classname == window[1])
-            or (all((not classname, name)) and name == window[2])
+        # 如果没指定 classname/name，先收集所有窗口（后续由 pid/uiaclsname 过滤）
+        if not classname and not name:
+            targets.append(uia.ControlFromHandle(window[0]))
+        elif (
+            (classname and name and classname == window[1] and name == window[2])
+            or (classname and not name and classname == window[1])
+            or (not classname and name and name == window[2])
         ):
             targets.append(uia.ControlFromHandle(window[0]))
     if pid:
