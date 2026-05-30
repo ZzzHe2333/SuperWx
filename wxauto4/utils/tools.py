@@ -34,19 +34,36 @@ def find_all_windows_from_root(classname:str=None, name:str=None, pid:int=None, 
     windows = GetAllWindows()
     targets = []
     for window in windows:
-        # 如果没指定 classname/name，先收集所有窗口（后续由 pid/uiaclsname 过滤）
-        if not classname and not name:
-            targets.append(uia.ControlFromHandle(window[0]))
-        elif (
-            (classname and name and classname == window[1] and name == window[2])
-            or (classname and not name and classname == window[1])
-            or (not classname and name and name == window[2])
-        ):
-            targets.append(uia.ControlFromHandle(window[0]))
+        try:
+            # 如果没指定 classname/name，先收集所有窗口（后续由 pid/uiaclsname 过滤）
+            if not classname and not name:
+                targets.append(uia.ControlFromHandle(window[0]))
+            elif (
+                (classname and name and classname == window[1] and name == window[2])
+                or (classname and not name and classname == window[1])
+                or (not classname and name and name == window[2])
+            ):
+                targets.append(uia.ControlFromHandle(window[0]))
+        except Exception:
+            continue
     if pid:
-        targets = [w for w in targets if w.ProcessId == pid]
+        filtered = []
+        for w in targets:
+            try:
+                if w.ProcessId == pid:
+                    filtered.append(w)
+            except Exception:
+                continue
+        targets = filtered
     if uiaclsname:
-        targets = [w for w in targets if w.ClassName == uiaclsname]
+        filtered = []
+        for w in targets:
+            try:
+                if w.ClassName == uiaclsname:
+                    filtered.append(w)
+            except Exception:
+                continue
+        targets = filtered
     return targets
 
 def now_time(fmt='%Y%m%d%H%M%S%f'):
