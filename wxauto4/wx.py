@@ -1047,3 +1047,96 @@ class WeChat(Chat, Listener):
         """
         return WxResponse.failure('not implemented: WeChat.GetDialog')
 
+    def GetFriendList(
+            self,
+            *,
+            dry_run: bool = True,
+            allow_foreground: bool = False,
+            max_scroll: int = 200,
+            interval: float = 0.2,
+            save_path: str = None,
+            include_details: bool = False,
+            stop_on_repeat: int = 3,
+        ) -> WxResponse:
+        """获取完整好友列表
+
+        Args:
+            dry_run (bool): 默认 True，只输出执行计划，不真实执行
+            allow_foreground (bool): 默认 False，需要前台操作时必须为 True
+            max_scroll (int): 最大滚动次数，防止无限滚动
+            interval (float): 每次滚动后等待时间（秒）
+            save_path (str, optional): 保存联系人列表的 JSON 文件路径
+            include_details (bool): 是否包含详细信息（当前未实现）
+            stop_on_repeat (int): 连续多少轮无新联系人时停止
+
+        Returns:
+            WxResponse: data 包含联系人列表
+
+        Note:
+            MEDIUM 风险。需要进入联系人页面并滚动。
+            默认 dry_run=True，不会真实执行。
+        """
+        # Case 1: dry_run → return plan
+        if dry_run:
+            return WxResponse.success(
+                data={
+                    'dry_run': True,
+                    'method': 'WeChat.GetFriendList',
+                    'would_do': [
+                        'SwitchToContact',
+                        'Locate contact list',
+                        'Scroll contact list',
+                        'Extract contact names',
+                        'Deduplicate contacts',
+                    ],
+                    'requires_foreground': True,
+                    'risk': 'MEDIUM',
+                    'message': 'Getting full friend list requires foreground UI scrolling',
+                }
+            )
+
+        # Case 2: dry_run=False, allow_foreground=False → fail
+        if not allow_foreground:
+            return WxResponse.failure(
+                'foreground required: GetFriendList requires switching to contact page and scrolling'
+            )
+
+        # Case 3: dry_run=False, allow_foreground=True, include_details=True → not implemented
+        if include_details:
+            return WxResponse.failure('not implemented: GetFriendList(include_details=True)')
+
+        # Case 4: dry_run=False, allow_foreground=True, include_details=False → real execution
+        if max_scroll is None:
+            max_scroll = 200
+        if interval < 0.1:
+            interval = 0.1
+
+        from wxauto4.ui.contactbox import ContactBox
+        try:
+            contactbox = ContactBox(self._api)
+            result = contactbox.get_all_contacts(
+                max_scroll=max_scroll,
+                interval=interval,
+                stop_on_repeat=stop_on_repeat,
+            )
+        except Exception as e:
+            return WxResponse.failure(f'获取好友列表失败: {e}')
+
+        if not result.is_success:
+            return result
+
+        contacts = result.get('data', {}).get('contacts', [])
+
+        # Save to file if requested
+        if save_path and contacts:
+            import json
+            os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(contacts, f, ensure_ascii=False, indent=2)
+
+        return WxResponse.success(data={'contacts': contacts, 'total': len(contacts)})
+
+    def GetFriends(self, **kwargs) -> WxResponse:
+        """获取完整好友列表（GetFriendList 别名）"""
+        return self.GetFriendList(**kwargs)
+
